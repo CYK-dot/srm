@@ -1,0 +1,124 @@
+#!/usr/bin/env python3
+"""
+Resolve srm_project.json into a flat structure:
+- storages: all local storages from all modules (keyed by name)
+- items: all items from all modules (with storage references resolved)
+Checks that every item.storages entry references an existing storage.
+"""
+import argparse
+import json
+import sys
+from pathlib import Path
+from typing import Dict, List, Any
+
+from src.scripts.srm_log import Logger
+
+PROG_NAME = "srm-project-merge"
+
+def load_project_json(path: Path, logger: Logger) -> Dict[str, Any]:
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except json.JSONDecodeError as e:
+        logger.error(f"invalid JSON in {path}: {e}")
+        sys.exit(1)
+    except Exception as e:
+        logger.error(f"cannot read {path}: {e}")
+        sys.exit(1)
+
+def resolve(modules: List[Dict], logger: Logger) -> Dict[str, Any]:
+    storages: Dict[str, dict] = {}
+    items: List[dict] = []
+
+    for mod in modules:
+        mod_name = mod["module"]["name"]
+
+        for storage in mod.get("local_storages", []):
+            name = storage.get("name")
+            if not name:
+                logger.error(f"module '{mod_name}': local storage missing 'name'")
+                sys.exit(1)
+            if name in storages:
+                logger.error(f"duplicate storage name '{name}' (from module '{mod_name}')")
+                sys.exit(1)
+            storages[name] = storage
+
+        for item in mod.get("items", []):
+            name = item.get("name")
+            if not name:
+                logger.error(f"module '{mod_name}': item missing 'name'")
+                sys.exit(1)
+            items.append(item)
+
+    # Validate item storage references
+    for item in items:
+        name = item.get("name")
+        storage_refs = item.get("storages", [])
+        if not storage_refs:
+            logger.error(f"item '{name}' has empty or missing 'storages' list")
+            sys.exit(1)
+        for sname in storage_refs:
+            if sname not in storages:
+                logger.error(
+                    f"item '{name}' references storage '{sname}' "
+                    f"which is not defined in any module's local_storages"
+                )
+                sys.exit(1)
+
+    return {"storages": storages, "items": items}
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Resolve srm_project.json into a flat storages+items structure."
+    )
+    parser.add_argument(
+        "input_file",
+        nargs="?",
+        default="srm_project.json",
+        help="input project JSON file (default: srm_project.json)",
+    )
+    parser.add_argument(
+        "-o", "--output",
+        default="srm_resolved.json",
+        help="output file name (default: srm_resolved.json)",
+    )
+    parser.add_argument(
+        "-v", "--verbose",
+        action="store_true",
+        help="show detailed processing information",
+    )
+    args = parser.parse_args()
+
+    logger = Logger(PROG_NAME)
+
+    input_path = Path(args.input_file)
+    if not input_path.is_file():
+        logger.error(f"input file not found: {input_path}")
+        sys.exit(1)
+
+    project_data = load_project_json(input_path, logger)
+
+    if "modules" not in project_data:
+        logger.error("missing 'modules' top-level key")
+        sys.exit(1)
+    modules = project_data["modules"]
+    if not isinstance(modules, list):
+        logger.error("'modules' must be an array")
+        sys.exit(1)
+
+    if args.verbose:
+        logger.info(f"loaded {len(modules)} modules from {input_path}")
+
+    resolved = resolve(modules, logger)
+
+    output_path = Path(args.output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(resolved, f, indent=2, ensure_ascii=False)
+
+    logger.ok(f"resolved {len(resolved['storages'])} storages and {len(resolved['items'])} items")
+    if args.verbose:
+        logger.verbose(f"output written to {output_path.resolve()}")
+
+if __name__ == "__main__":
+    main()

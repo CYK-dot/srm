@@ -1,0 +1,102 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://example.com/schemas/srm_module.schema.json",
+  "title": "SRM Module Descriptor",
+  "description": "Schema for srm_module.json",
+  "type": "object",
+  "properties": {
+    "module": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "comments": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        }
+      },
+      "required": ["name"],
+      "additionalProperties": false
+    },
+    "local_storages": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "comments": {
+            "type": "array",
+            "items": { "type": "string" },
+            "uniqueItems": true
+          },
+          "readonly": { "type": "boolean" },
+          "size": { "type": "integer", "minimum": 1 }
+        },
+        "required": ["name"],
+        "additionalProperties": false
+      }
+    },
+    "external_storages": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "source_module": { "type": "string" },
+          "comments": {
+            "type": "array",
+            "items": { "type": "string" },
+            "uniqueItems": true
+          }
+        },
+        "required": ["name", "source_module"],
+        "additionalProperties": false
+      }
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "storages": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "data_type": {
+            "type": "string",
+            "enum": ["log", "counter", "measure"]
+          },
+          "comments": {
+            "type": "array",
+            "items": { "type": "string" },
+            "uniqueItems": true
+          },
+          "format": { "type": "string" }
+        },
+        "required": ["name", "storages", "data_type"],
+        "allOf": [
+          {
+            "if": {
+              "properties": { "data_type": { "const": "log" } }
+            },
+            "then": {
+              "required": ["format"]
+            }
+          }
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["module"],
+  "anyOf": [
+    { "required": ["local_storages"] },
+    { "required": ["external_storages"] }
+  ],
+  "additionalProperties": false
+}
