@@ -101,6 +101,7 @@ ctest -R test_c_f1 -V
 | test_c_f9_02_align8_already_aligned | F9 | 8字节对齐已对齐 |
 | test_c_f9_03_align4_need_padding | F9 | 4字节对齐需要填充 |
 | test_c_f9_04_align8_need_padding | F9 | 8字节对齐需要填充 |
+| test_c_f10_srm_interface | F10 | SRM接口分离测试（target_link_srm_library + target_link_srm_interface） |
 
 ## 测试输出示例
 
@@ -161,5 +162,6 @@ c_tests/
 ├── test_f6_storage_size.c      # F6 storage size测试
 ├── test_f7_item_size.c         # F7 item size测试
 ├── test_f8_name_conversion.c   # F8名称转换测试
-└── test_f9_alignment.c         # F9对齐计算测试
+├── test_f9_alignment.c         # F9对齐计算测试
+└── test_f10_srm_interface.c    # F10 SRM接口分离测试
 ```

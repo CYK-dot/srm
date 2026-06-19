@@ -223,3 +223,33 @@ srm_add_test(
     ROOT_DIR "${TESTCASE_PROJECTS_DIR}/C-TC-F9-04"
     TEST_FILE "test_f9_alignment.c"
 )
+
+# F10 - SRM接口分离测试
+# 此测试验证 target_link_srm_library + target_link_srm_interface 的两层接口
+# 1. 项目级：使用 target_link_srm_library 创建实现库
+# 2. 组件级：使用 target_link_srm_interface 仅获取头文件接口
+
+# 创建SRM实现库（项目级）
+set(F10_SRM_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/f10_srm_generated")
+target_link_srm_library(test_c_f10_srm_lib
+    ROOT_DIR "${TESTCASE_PROJECTS_DIR}/C-TC-F4-01"
+    OUTPUT_DIR "${F10_SRM_OUTPUT_DIR}"
+)
+
+# 创建测试可执行文件（组件级）
+add_executable(test_c_f10_srm_interface
+    "test_f10_srm_interface.c"
+)
+
+# 组件仅通过 interface 获取头文件，不直接链接实现库
+target_link_srm_interface(test_c_f10_srm_interface
+    LINK_LIBRARY test_c_f10_srm_lib
+)
+
+# 链接Unity和SRM实现库
+target_link_libraries(test_c_f10_srm_interface PRIVATE
+    unity
+    test_c_f10_srm_lib
+)
+
+add_test(NAME test_c_f10_srm_interface COMMAND test_c_f10_srm_interface)
