@@ -80,7 +80,12 @@ SRM 工具链提供两层 CMake 接口，分离「组件接口」与「项目实
 在项目顶层 CMakeLists.txt 中创建 SRM 实现库：
 
 ```cmake
-include(srm)
+include(FetchContent)
+FetchContent_Declare(
+    edfx
+    GIT_REPOSITORY https://github.com/CYK-dot/srm.git
+)
+FetchContent_MakeAvailable(edfx)
 
 # 创建 SRM 实现库（指定配置目录和输出目录）
 target_link_srm_library(my_srm
