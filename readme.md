@@ -68,15 +68,15 @@ python src/scripts/srm_build.py --root . --output-dir build/srm
 
 ### FetchContent 集成（推荐）
 
-通过 CMake FetchContent 引入 edfx 工具链：
+通过 CMake FetchContent 引入 srm 工具链：
 
 ```cmake
 include(FetchContent)
-FetchContent_Declare(edfx
+FetchContent_Declare(srm
     GIT_REPOSITORY https://github.com/CYK-dot/srm.git
     GIT_TAG        main  # 或指定版本标签
 )
-FetchContent_MakeAvailable(edfx)
+FetchContent_MakeAvailable(srm)
 
 # 此后可使用 srm_* 函数
 include(srm)
@@ -108,13 +108,12 @@ my_project/
 cmake_minimum_required(VERSION 3.20)
 project(my_app C)
 
-# 引入 edfx 工具链
+# 引入 srm 工具链
 include(FetchContent)
-FetchContent_Declare(edfx
+FetchContent_Declare(srm
     GIT_REPOSITORY https://github.com/CYK-dot/srm.git
-    GIT_TAG        main
 )
-FetchContent_MakeAvailable(edfx)
+FetchContent_MakeAvailable(srm)
 include(srm)
 
 # 创建 SRM 实现库
