@@ -66,54 +66,87 @@ python src/scripts/srm_build.py --root . --output-dir build/srm
 
 ## 在其他项目中引用
 
-SRM 工具链提供两层 CMake 接口，分离「组件接口」与「项目实现」：
+### FetchContent 集成（推荐）
 
-### 接口说明
-
-| 接口 | 用途 | 说明 |
-|------|------|------|
-| `target_link_srm_library` | 项目级 | 生成 SRM 代码并创建实现库 |
-| `target_link_srm_interface` | 组件级 | 仅提供头文件接口，不链接实现 |
-
-### 项目级用法
-
-在项目顶层 CMakeLists.txt 中创建 SRM 实现库：
+通过 CMake FetchContent 引入 edfx 工具链：
 
 ```cmake
 include(FetchContent)
-FetchContent_Declare(
-    edfx
+FetchContent_Declare(edfx
     GIT_REPOSITORY https://github.com/CYK-dot/srm.git
+    GIT_TAG        main  # 或指定版本标签
 )
 FetchContent_MakeAvailable(edfx)
 
-# 创建 SRM 实现库（指定配置目录和输出目录）
+# 此后可使用 srm_* 函数
+include(srm)
+```
+
+### CMake 接口
+
+| 接口 | 层级 | 用途 |
+|------|------|------|
+| `target_link_srm_library` | 项目级 | 生成 SRM 代码并创建静态库 |
+| `target_link_srm_interface` | 组件级 | 仅添加头文件路径，不链接实现 |
+
+### 完整用法示例
+
+**1. 准备 SRM 配置目录**
+
+```
+my_project/
+├── CMakeLists.txt
+└── srm/
+    ├── srm_types.json
+    └── module_sensor/
+        └── srm_module.json
+```
+
+**2. 项目顶层 CMakeLists.txt**
+
+```cmake
+cmake_minimum_required(VERSION 3.20)
+project(my_app C)
+
+# 引入 edfx 工具链
+include(FetchContent)
+FetchContent_Declare(edfx
+    GIT_REPOSITORY https://github.com/CYK-dot/srm.git
+    GIT_TAG        main
+)
+FetchContent_MakeAvailable(edfx)
+include(srm)
+
+# 创建 SRM 实现库
 target_link_srm_library(my_srm
-    ROOT_DIR ${CMAKE_SOURCE_DIR}/srm
+    ROOT_DIR   ${CMAKE_SOURCE_DIR}/srm
     OUTPUT_DIR ${CMAKE_BINARY_DIR}/srm_generated
 )
 
-# 链接到最终目标
-target_link_libraries(my_app PRIVATE my_srm)
+# 添加子项目
+add_subdirectory(components/a_component)
+add_subdirectory(components/b_component)
+
+# 最终可执行文件
+add_executable(my_app main.c)
+target_link_libraries(my_app PRIVATE my_srm a_component b_component)
 ```
 
-### 组件级用法
-
-在组件 CMakeLists.txt 中仅获取头文件接口：
+**3. 组件 CMakeLists.txt（如 b_component）**
 
 ```cmake
-# 方式1：引用 SRM 库目标（推荐）
+add_library(b_component STATIC b_component.c)
+
+# 仅获取 SRM 头文件接口，不链接实现
 target_link_srm_interface(b_component
     LINK_LIBRARY my_srm
 )
 
-# 方式2：直接指定输出目录
-target_link_srm_interface(b_component
-    OUTPUT_DIR ${CMAKE_BINARY_DIR}/srm_generated
-)
+# 链接 SRM 实现库（由项目顶层控制）
+target_link_libraries(b_component PRIVATE my_srm)
 ```
 
-组件源码中直接调用 SRM 函数：
+**4. 组件源码中调用 SRM 函数**
 
 ```c
 #include "srm_layout.h"
@@ -126,38 +159,35 @@ void read_sensor_data(void) {
 }
 ```
 
-### 多组件项目示例
+### 多组件协作场景
 
-```cmake
-include(srm)
-
-# 项目级：创建 SRM 实现库（包含所有模块配置）
-target_link_srm_library(project_srm
-    ROOT_DIR ${CMAKE_SOURCE_DIR}/srm
-    OUTPUT_DIR ${CMAKE_BINARY_DIR}/srm_generated
-)
-
-# 组件 A：生产者（定义 SRM 资源）
-target_link_srm_interface(a_component
-    LINK_LIBRARY project_srm
-)
-target_link_libraries(a_component PRIVATE project_srm)
-
-# 组件 B：消费者（仅调用 SRM 函数）
-target_link_srm_interface(b_component
-    LINK_LIBRARY project_srm
-)
-target_link_libraries(b_component PRIVATE project_srm)
-
-# 最终目标
-target_link_libraries(my_app PRIVATE a_component b_component)
+```
+项目结构：
+  a_component - 定义 SRM 资源（生产者）
+  b_component - 仅调用 SRM 函数（消费者）
+  my_app      - 最终可执行文件
 ```
 
-### 优势
+关键点：
+- **只有项目顶层**调用 `target_link_srm_library` 创建实现库
+- **所有组件**通过 `target_link_srm_interface` 获取头文件接口
+- **链接权在项目层**，组件不自行决定链接哪个 SRM 库
 
-- **无弱函数问题**：实现只有一份，由项目级库提供，避免链接顺序问题
-- **清晰的依赖关系**：组件只依赖接口，项目控制实现
-- **灵活的配置**：组件无需知道 SRM 配置细节，只需引用库目标
+### 接口参数
+
+**target_link_srm_library**
+
+| 参数 | 必填 | 说明 |
+|------|------|------|
+| `ROOT_DIR` | 是 | SRM 配置目录（含 `srm_types.json` 和模块子目录） |
+| `OUTPUT_DIR` | 是 | 生成文件的输出目录 |
+
+**target_link_srm_interface**
+
+| 参数 | 必填 | 说明 |
+|------|------|------|
+| `LINK_LIBRARY` | 二选一 | 引用的 SRM 库目标名称（自动获取输出目录） |
+| `OUTPUT_DIR` | 二选一 | 直接指定 SRM 生成文件目录 |
 
 ## 运行测试
 
