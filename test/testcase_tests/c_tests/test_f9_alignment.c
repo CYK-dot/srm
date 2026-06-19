@@ -5,6 +5,7 @@
  */
 
 #include "unity.h"
+#include "srm.h"
 #include "srm_layout.h"
 
 void setUp(void)

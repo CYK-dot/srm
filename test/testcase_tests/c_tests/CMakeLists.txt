@@ -226,30 +226,25 @@ srm_add_test(
 
 # F10 - SRM接口分离测试
 # 此测试验证 target_link_srm_library + target_link_srm_interface 的两层接口
-# 1. 项目级：使用 target_link_srm_library 创建实现库
-# 2. 组件级：使用 target_link_srm_interface 仅获取头文件接口
+# 1. 项目级：使用 target_link_srm_library 将SRM实现注入可执行文件
+# 2. 组件级：使用 target_link_srm_interface 仅获取头文件接口，不耦合任何库
 
-# 创建SRM实现库（项目级）
-set(F10_SRM_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/f10_srm_generated")
-target_link_srm_library(test_c_f10_srm_lib
-    ROOT_DIR "${TESTCASE_PROJECTS_DIR}/C-TC-F4-01"
-    OUTPUT_DIR "${F10_SRM_OUTPUT_DIR}"
-)
-
-# 创建测试可执行文件（组件级）
+# 创建测试可执行文件
 add_executable(test_c_f10_srm_interface
     "test_f10_srm_interface.c"
 )
 
-# 组件仅通过 interface 获取头文件，不直接链接实现库
-target_link_srm_interface(test_c_f10_srm_interface
-    LINK_LIBRARY test_c_f10_srm_lib
+# 项目级：将SRM实现（.c）注入可执行文件
+target_link_srm_library(test_c_f10_srm_interface
+    PROJ_ROOT_DIR "${TESTCASE_PROJECTS_DIR}/C-TC-F4-01"
+    OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/f10_srm_generated"
 )
 
-# 链接Unity和SRM实现库
-target_link_libraries(test_c_f10_srm_interface PRIVATE
-    unity
-    test_c_f10_srm_lib
-)
+# 组件级：仅暴露头文件路径（验证接口分离）
+# 此调用不耦合任何库目标，仅从全局属性获取.srm_layout.h路径
+target_link_srm_interface(test_c_f10_srm_interface)
+
+# 链接Unity
+target_link_libraries(test_c_f10_srm_interface PRIVATE unity)
 
 add_test(NAME test_c_f10_srm_interface COMMAND test_c_f10_srm_interface)

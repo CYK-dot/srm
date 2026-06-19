@@ -1,23 +1,25 @@
 # srm.cmake - SRM工具链CMake模块
 #
 # 两层接口设计：
-#   target_link_srm_library   - 项目级：生成SRM代码并创建实现库
-#   target_link_srm_interface - 组件级：仅提供头文件接口
+#   target_link_srm_library   - 项目级：生成SRM代码，将.c注入可执行文件
+#   target_link_srm_interface - 组件级：暴露 srm.h 和 srm_layout.h 头文件路径
+#
+# 文件职责：
+#   srm.h          - 由 srm 工具链持有（src/srm.h），包含通用函数声明
+#   srm_layout.h   - 由 python 脚本生成，包含项目特定的宏定义
+#   srm.c          - 由 python 脚本生成，包含函数实现
 #
 # 用法示例：
 #   include(srm)
 #
-#   # 项目级：创建实现库
-#   target_link_srm_library(my_srm
-#       ROOT_DIR ${CMAKE_SOURCE_DIR}/srm
-#       OUTPUT_DIR ${CMAKE_BINARY_DIR}/srm_generated
+#   # 项目级：将SRM实现注入可执行文件
+#   add_executable(my_app main.c)
+#   target_link_srm_library(my_app
+#       PROJ_ROOT_DIR ${CMAKE_SOURCE_DIR}
 #   )
 #
-#   # 组件级：仅获取接口
-#   target_link_srm_interface(b_component LINK_LIBRARY my_srm)
-#
-#   # 链接
-#   target_link_libraries(b_component PRIVATE my_srm)
+#   # 组件级：获取srm.h和srm_layout.h头文件路径
+#   target_link_srm_interface(b_component)
 
 # --- 基础配置 ---
 
@@ -33,38 +35,47 @@ endif()
 
 # =============================================================================
 # target_link_srm_library
-# 项目级接口：生成SRM代码并创建静态库
+# 项目级接口：生成SRM代码，将.c注入可执行文件
 #
 # 参数：
-#   ROOT_DIR   - SRM配置目录（包含srm_types.json和模块子目录）
-#   OUTPUT_DIR - 生成文件的输出目录
+#   TARGET_NAME   - 可执行文件目标名称（必须已通过 add_executable 定义）
+#   PROJ_ROOT_DIR - SRM配置目录（包含srm_types.json和模块子目录）
+#   OUTPUT_DIR    - 生成文件的输出目录（可选，默认 ${CMAKE_BINARY_DIR}/srm_generated）
 #
-# 输出：
-#   创建静态库目标，设置 SRM_OUTPUT_DIR 属性供 interface 使用
+# 行为：
+#   - 生成 srm_layout.h 和 srm.c
+#   - 将 srm.c 通过 target_sources 注入到目标可执行文件
+#   - 将 srm_layout.h 所在目录添加到目标的包含路径
+#   - 设置全局属性 SRM_LAYOUT_HEADER_DIR 供 target_link_srm_interface 读取
 # =============================================================================
 function(target_link_srm_library TARGET_NAME)
-    cmake_parse_arguments(ARG "" "ROOT_DIR;OUTPUT_DIR" "" ${ARGN})
+    cmake_parse_arguments(ARG "" "PROJ_ROOT_DIR;OUTPUT_DIR" "" ${ARGN})
 
-    if(NOT ARG_ROOT_DIR)
-        message(FATAL_ERROR "target_link_srm_library: ROOT_DIR is required")
+    if(NOT ARG_PROJ_ROOT_DIR)
+        message(FATAL_ERROR "target_link_srm_library: PROJ_ROOT_DIR is required")
     endif()
+    if(NOT TARGET ${TARGET_NAME})
+        message(FATAL_ERROR "target_link_srm_library: Target '${TARGET_NAME}' does not exist. Create it with add_executable first.")
+    endif()
+
+    get_filename_component(PROJ_ROOT_DIR "${ARG_PROJ_ROOT_DIR}" ABSOLUTE)
+
+    # OUTPUT_DIR 默认值
     if(NOT ARG_OUTPUT_DIR)
-        message(FATAL_ERROR "target_link_srm_library: OUTPUT_DIR is required")
+        set(ARG_OUTPUT_DIR "${CMAKE_BINARY_DIR}/srm_generated")
     endif()
-
-    get_filename_component(ROOT_DIR "${ARG_ROOT_DIR}" ABSOLUTE)
     get_filename_component(OUTPUT_DIR "${ARG_OUTPUT_DIR}" ABSOLUTE)
 
     # 收集SRM配置文件作为构建依赖
     file(GLOB_RECURSE SRM_DEPENDS
-        "${ROOT_DIR}/srm_types.json"
-        "${ROOT_DIR}/*/srm_module.json"
-        "${ROOT_DIR}/*/*/srm_module.json"
+        "${PROJ_ROOT_DIR}/srm_types.json"
+        "${PROJ_ROOT_DIR}/*/srm_module.json"
+        "${PROJ_ROOT_DIR}/*/*/srm_module.json"
     )
 
     list(LENGTH SRM_DEPENDS DEPENDS_COUNT)
     if(DEPENDS_COUNT EQUAL 0)
-        message(WARNING "No SRM config found in ${ROOT_DIR}")
+        message(WARNING "No SRM config found in ${PROJ_ROOT_DIR}")
     endif()
 
     set(GENERATED_H "${OUTPUT_DIR}/srm_layout.h")
@@ -74,7 +85,7 @@ function(target_link_srm_library TARGET_NAME)
     add_custom_command(
         OUTPUT ${GENERATED_H} ${GENERATED_C}
         COMMAND ${Python3_EXECUTABLE} "${SRM_BUILD_SCRIPT}"
-            --root "${ROOT_DIR}"
+            --root "${PROJ_ROOT_DIR}"
             --output-dir "${OUTPUT_DIR}"
         DEPENDS ${SRM_DEPENDS}
                 "${SRM_BUILD_SCRIPT}"
@@ -89,54 +100,49 @@ function(target_link_srm_library TARGET_NAME)
         VERBATIM
     )
 
-    add_custom_target(${TARGET_NAME}_generate DEPENDS ${GENERATED_H} ${GENERATED_C})
+    add_custom_target(${TARGET_NAME}_srm_generate DEPENDS ${GENERATED_H} ${GENERATED_C})
 
-    # 创建静态库并设置包含路径
-    add_library(${TARGET_NAME} STATIC ${GENERATED_C})
-    target_include_directories(${TARGET_NAME} PUBLIC ${OUTPUT_DIR})
-    add_dependencies(${TARGET_NAME} ${TARGET_NAME}_generate)
+    # 将 srm.c 注入到可执行文件目标
+    target_sources(${TARGET_NAME} PRIVATE ${GENERATED_C})
+    # 添加 srm_layout.h 所在目录（生成产物目录）
+    target_include_directories(${TARGET_NAME} PRIVATE ${OUTPUT_DIR})
+    add_dependencies(${TARGET_NAME} ${TARGET_NAME}_srm_generate)
 
-    # 存储OUTPUT_DIR供 target_link_srm_interface 读取
-    set_target_properties(${TARGET_NAME} PROPERTIES SRM_OUTPUT_DIR "${OUTPUT_DIR}")
+    # 设置全局属性，供 target_link_srm_interface 读取 srm_layout.h 路径
+    set_property(GLOBAL PROPERTY SRM_LAYOUT_HEADER_DIR "${OUTPUT_DIR}")
 endfunction()
 
 # =============================================================================
 # target_link_srm_interface
-# 组件级接口：仅添加头文件路径，不链接实现库
+# 组件级接口：暴露 srm.h 和 srm_layout.h 头文件路径，不耦合任何库目标
 #
-# 参数（二选一）：
-#   LINK_LIBRARY - 引用的SRM库目标名称（自动获取OUTPUT_DIR）
-#   OUTPUT_DIR   - 直接指定SRM生成文件目录
+# 参数：
+#   TARGET_NAME - 需要使用SRM接口的组件目标名称
+#
+# 行为：
+#   - 将 srm.h 所在目录（${SRM_PROJECT_ROOT}/src）添加到目标的包含路径
+#   - 将 srm_layout.h 所在目录（由 target_link_srm_library 设置的全局属性）添加到目标的包含路径
+#   - 组件可 #include "srm.h" 和 #include "srm_layout.h" 使用SRM接口
+#   - 组件不链接任何实现库，实现由项目级 target_link_srm_library 注入
 # =============================================================================
 function(target_link_srm_interface TARGET_NAME)
-    cmake_parse_arguments(ARG "" "LINK_LIBRARY;OUTPUT_DIR" "" ${ARGN})
-
-    if(NOT ARG_LINK_LIBRARY AND NOT ARG_OUTPUT_DIR)
-        message(FATAL_ERROR "target_link_srm_interface: LINK_LIBRARY or OUTPUT_DIR required")
-    endif()
-    if(ARG_LINK_LIBRARY AND ARG_OUTPUT_DIR)
-        message(FATAL_ERROR "target_link_srm_interface: LINK_LIBRARY and OUTPUT_DIR are mutually exclusive")
+    if(NOT TARGET ${TARGET_NAME})
+        message(FATAL_ERROR "target_link_srm_interface: Target '${TARGET_NAME}' does not exist")
     endif()
 
-    if(ARG_LINK_LIBRARY)
-        if(NOT TARGET ${ARG_LINK_LIBRARY})
-            message(FATAL_ERROR "target_link_srm_interface: Target '${ARG_LINK_LIBRARY}' not found")
-        endif()
-        get_target_property(OUTPUT_DIR ${ARG_LINK_LIBRARY} SRM_OUTPUT_DIR)
-        if(NOT OUTPUT_DIR)
-            message(FATAL_ERROR "target_link_srm_interface: '${ARG_LINK_LIBRARY}' has no SRM_OUTPUT_DIR property")
-        endif()
-    else()
-        get_filename_component(OUTPUT_DIR "${ARG_OUTPUT_DIR}" ABSOLUTE)
-    endif()
+    # 暴露 srm.h 路径（通用函数声明）
+    target_include_directories(${TARGET_NAME} PRIVATE "${SRM_PROJECT_ROOT}/src")
 
-    # 仅添加头文件目录
-    target_include_directories(${TARGET_NAME} PRIVATE ${OUTPUT_DIR})
+    # 暴露 srm_layout.h 路径（项目特定宏定义，由 target_link_srm_library 生成）
+    get_property(SRM_LAYOUT_HEADER_DIR GLOBAL PROPERTY SRM_LAYOUT_HEADER_DIR)
+    if(SRM_LAYOUT_HEADER_DIR)
+        target_include_directories(${TARGET_NAME} PRIVATE "${SRM_LAYOUT_HEADER_DIR}")
+    endif()
 endfunction()
 
 # =============================================================================
 # srm_add_test
-# 内部函数：添加SRM测试用例
+# 内部函数：添加SRM测试用例（自包含，独立于上述两层接口）
 #
 # 参数：
 #   NAME      - 测试名称
@@ -176,7 +182,8 @@ function(srm_add_test)
     add_executable(${ARG_NAME} "${ARG_TEST_FILE}" "${c_file}")
 
     target_include_directories(${ARG_NAME} PRIVATE
-        "${output_dir}"
+        "${SRM_PROJECT_ROOT}/src"     # srm.h
+        "${output_dir}"               # srm_layout.h
         "${unity_SOURCE_DIR}/src"
     )
 

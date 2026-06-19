@@ -9,7 +9,8 @@
  */
 
 #include "unity.h"
-#include "srm_layout.h"
+#include "srm.h"          /* 通用函数声明（srm工具链持有） */
+#include "srm_layout.h"   /* 项目特定宏定义（python生成） */
 
 void setUp(void)
 {

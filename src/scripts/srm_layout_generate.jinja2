@@ -3,11 +3,12 @@
 /*
  * {{ output_file }} - Auto-generated SRM layout header
  * Generated at: {{ timestamp }}
+ *
+ * 此文件由 python 脚本生成，包含项目特定的宏定义。
+ * 通用函数声明在 srm.h 中，由 srm 工具链持有。
  */
 #ifndef SRM_LAYOUT_H
 #define SRM_LAYOUT_H
-
-#include <stdint.h>
 
 /* ========================== Type Enumerations ========================== */
 typedef enum {
@@ -28,29 +29,6 @@ typedef enum {
 #define SRM_ITEM_{{ item.c_name }}_TYPE {{ item.type_num }}
 {%- endfor %}
 
-/* ========================== Runtime Lookup Functions ========================== */
-/**
- * @brief Get the offset of an item within a specific storage.
- * @param storage_id Storage ID (e.g., SRM_STORAGE_xxx_ID)
- * @param item_id    Item ID (e.g., SRM_ITEM_xxx_ID)
- * @return Offset in bytes, or 0xFFFF if the item is not placed in that storage.
- */
-uint16_t srm_get_offset(uint16_t storage_id, uint16_t item_id);
-
-/**
- * @brief Get the total size (capacity) of a storage.
- * @param storage_id Storage ID
- * @return Size in bytes, or 0 if storage not found.
- */
-uint16_t srm_get_storage_size(uint16_t storage_id);
-
-/**
- * @brief Get the length (size) of an item.
- * @param item_id Item ID
- * @return Length in bytes, or 0 if item not found.
- */
-uint16_t srm_get_item_size(uint16_t item_id);
-
 #endif /* SRM_LAYOUT_H */
 
 {% elif output_file == 'c' %}
@@ -58,6 +36,7 @@ uint16_t srm_get_item_size(uint16_t item_id);
  * {{ output_file }} - Auto-generated SRM layout lookup implementation
  * Generated at: {{ timestamp }}
  */
+#include "srm.h"
 #include "srm_layout.h"
 
 /* ========================== srm_get_offset ========================== */

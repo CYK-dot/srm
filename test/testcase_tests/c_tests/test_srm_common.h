@@ -8,6 +8,7 @@
 #define TEST_SRM_COMMON_H
 
 #include "unity.h"
+#include "srm.h"
 #include "srm_layout.h"
 
 /**
