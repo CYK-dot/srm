@@ -1,0 +1,19 @@
+{
+  "module": {
+    "name": "sensor"
+  },
+  "local_storages": [
+    {
+      "name": "buf",
+      "size": 64
+    }
+  ],
+  "items": [
+    {
+      "name": "3rdval",
+      "data_type": "log",
+      "format": "test",
+      "storages": ["buf"]
+    }
+  ]
+}

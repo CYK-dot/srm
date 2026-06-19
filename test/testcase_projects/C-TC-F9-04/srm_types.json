@@ -1,0 +1,14 @@
+{
+  "types": [
+    {
+      "name": "type_a",
+      "length": 10,
+      "alignment": 1
+    },
+    {
+      "name": "type_b",
+      "length": 4,
+      "alignment": 8
+    }
+  ]
+}

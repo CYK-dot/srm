@@ -1,0 +1,23 @@
+{
+  "module": {
+    "name": "sensor"
+  },
+  "local_storages": [
+    {
+      "name": "buf",
+      "size": 64
+    }
+  ],
+  "items": [
+    {
+      "name": "a",
+      "data_type": "type_a",
+      "storages": ["buf"]
+    },
+    {
+      "name": "b",
+      "data_type": "type_b",
+      "storages": ["buf"]
+    }
+  ]
+}

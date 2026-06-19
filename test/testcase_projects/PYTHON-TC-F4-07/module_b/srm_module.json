@@ -1,0 +1,18 @@
+{
+  "module": {
+    "name": "module_b"
+  },
+  "external_storages": [
+    {
+      "name": "shared_buf",
+      "source_module": "nonexistent_module"
+    }
+  ],
+  "items": [
+    {
+      "name": "data",
+      "data_type": "counter",
+      "storages": ["shared_buf"]
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "module": {
+    "name": "sensor"
+  },
+  "items": [
+    {
+      "name": "temperature",
+      "data_type": "counter",
+      "storages": ["sensor_data"]
+    }
+  ]
+}

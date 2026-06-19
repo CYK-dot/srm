@@ -1,0 +1,18 @@
+{
+  "module": {
+    "name": "actuator"
+  },
+  "local_storages": [
+    {
+      "name": "shared_buf",
+      "size": 32
+    }
+  ],
+  "items": [
+    {
+      "name": "shared_item",
+      "data_type": "counter",
+      "storages": ["shared_buf"]
+    }
+  ]
+}

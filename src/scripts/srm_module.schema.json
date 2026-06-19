@@ -68,8 +68,7 @@
             "uniqueItems": true
           },
           "data_type": {
-            "type": "string",
-            "enum": ["log", "counter", "measure"]
+            "type": "string"
           },
           "comments": {
             "type": "array",

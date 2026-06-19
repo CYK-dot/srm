@@ -1,0 +1,16 @@
+{
+  "module": {},
+  "local_storages": [
+    {
+      "name": "actuator_data",
+      "size": 32
+    }
+  ],
+  "items": [
+    {
+      "name": "status",
+      "data_type": "counter",
+      "storages": ["actuator_data"]
+    }
+  ]
+}

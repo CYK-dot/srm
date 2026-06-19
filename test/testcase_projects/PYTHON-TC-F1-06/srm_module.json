@@ -1,0 +1,17 @@
+{
+  "module": {
+    "name": "sensor"
+  },
+  "local_storages": [
+    {
+      "name": "sensor_data",
+      "size": 64
+    }
+  ],
+  "items": [
+    {
+      "name": "temperature",
+      "storages": ["sensor_data"]
+    }
+  ]
+}

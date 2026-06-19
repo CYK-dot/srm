@@ -1,0 +1,9 @@
+{
+  "types": [
+    {
+      "name": "counter",
+      "length": 4,
+      "alignment": 4
+    }
+  ]
+}

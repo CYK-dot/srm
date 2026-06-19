@@ -1,0 +1,23 @@
+{
+  "module": {
+    "name": "sensor"
+  },
+  "local_storages": [
+    {
+      "name": "buf",
+      "size": 64
+    }
+  ],
+  "items": [
+    {
+      "name": "alpha",
+      "data_type": "counter",
+      "storages": ["buf"]
+    },
+    {
+      "name": "beta",
+      "data_type": "measure",
+      "storages": ["buf"]
+    }
+  ]
+}

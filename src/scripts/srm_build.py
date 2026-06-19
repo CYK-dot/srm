@@ -11,9 +11,26 @@ from pathlib import Path
 
 def run_script(script_name, args, cwd, logger=None):
     """运行单个 Python 脚本并检查返回值"""
-    cmd = [sys.executable, script_name] + args
+    # 获取脚本所在目录
+    script_dir = Path(__file__).parent
+    script_path = script_dir / script_name
+    
+    # 确保cwd是有效的目录
+    cwd = Path(cwd)
+    if not cwd.is_dir():
+        print(f"[SRM] ERROR: Working directory does not exist: {cwd}")
+        sys.exit(1)
+    
+    # 设置PYTHONPATH环境变量，确保模块导入正常
+    # 项目根目录是脚本目录的父目录的父目录
+    project_root = script_dir.parent.parent
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(project_root) + os.pathsep + env.get("PYTHONPATH", "")
+    
+    cmd = [sys.executable, str(script_path)] + args
     print(f"[SRM] Running: {' '.join(cmd)}")
-    result = subprocess.run(cmd, cwd=cwd)
+    print(f"[SRM] Working directory: {cwd}")
+    result = subprocess.run(cmd, cwd=str(cwd), env=env)
     if result.returncode != 0:
         print(f"[SRM] ERROR: {script_name} failed with code {result.returncode}")
         sys.exit(result.returncode)
@@ -27,6 +44,9 @@ def main():
     root = Path(args.root).resolve()
     output_dir = Path(args.output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # 获取脚本所在目录
+    script_dir = Path(__file__).parent
 
     # 定义各步骤输出文件
     collected_json = output_dir / "collected.json"
@@ -34,7 +54,7 @@ def main():
     out_base       = output_dir / "srm_layout"  # 无扩展名
 
     # 1. 验证组件
-    run_script("srm_module_verify.py", ["--schema", str(root / "srm_module.schema.json")], cwd=root)
+    run_script("srm_module_verify.py", ["--schema", str(script_dir / "srm_module.schema.json")], cwd=root)
 
     # 2. 收集所有模块
     run_script("srm_module_collect.py", ["-o", str(collected_json)], cwd=root)
@@ -52,7 +72,8 @@ def main():
     run_script("srm_layout_generate.py", [
         "--resolved", str(merged_json),
         "--types", str(root / "srm_types.json"),
-        "--output", str(out_base)
+        "--output", str(out_base),
+        "--template", str(script_dir / "srm_layout_generate.jinja2")
     ], cwd=root)
 
     print(f"[SRM] Build completed. Generated files in {output_dir}")

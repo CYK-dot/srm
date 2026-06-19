@@ -1,0 +1,18 @@
+{
+  "module": {
+    "name": "sensor"
+  },
+  "local_storages": [
+    {
+      "name": "sensor_data",
+      "size": 64
+    }
+  ],
+  "items": [
+    {
+      "name": "temp",
+      "data_type": "counter",
+      "storages": ["sensor_data"]
+    }
+  ]
+}

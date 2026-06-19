@@ -1,0 +1,9 @@
+{
+  "types": [
+    {
+      "name": "log",
+      "length_strip": "${format}",
+      "alignment": 1
+    }
+  ]
+}

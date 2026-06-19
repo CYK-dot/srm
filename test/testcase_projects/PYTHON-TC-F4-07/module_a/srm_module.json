@@ -1,0 +1,18 @@
+{
+  "module": {
+    "name": "module_a"
+  },
+  "local_storages": [
+    {
+      "name": "buf",
+      "size": 64
+    }
+  ],
+  "items": [
+    {
+      "name": "temp",
+      "data_type": "counter",
+      "storages": ["buf"]
+    }
+  ]
+}

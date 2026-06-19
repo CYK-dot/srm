@@ -1,0 +1,24 @@
+{
+  "module": {
+    "name": "actuator"
+  },
+  "local_storages": [
+    {
+      "name": "actuator_data",
+      "size": 32
+    }
+  ],
+  "external_storages": [
+    {
+      "name": "sensor_data",
+      "source_module": "sensor"
+    }
+  ],
+  "items": [
+    {
+      "name": "status",
+      "data_type": "counter",
+      "storages": []
+    }
+  ]
+}
