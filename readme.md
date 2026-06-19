@@ -83,8 +83,7 @@ python srm_layout_generate.py --resolved build/srm/merged.json --types srm_types
 include(FetchContent)
 FetchContent_Declare(
     edfx
-    GIT_REPOSITORY https://github.com/your-org/edfx.git
-    GIT_TAG v1.0.0
+    GIT_REPOSITORY https://github.com/CYK-dot/srm.git
 )
 FetchContent_MakeAvailable(edfx)
 
