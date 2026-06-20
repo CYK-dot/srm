@@ -1,9 +1,0 @@
-{
-  "types": [
-    {
-      "name": "log",
-      "alignment": 1,
-      "readonly": true
-    }
-  ]
-}

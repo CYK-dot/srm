@@ -30,6 +30,13 @@ def to_c_identifier(name: str) -> str:
         s = '_' + s
     return s.upper()
 
+def to_c_lower_identifier(name: str) -> str:
+    """Convert to C identifier in lowercase (for g_srm_xxx naming)."""
+    s = re.sub(r'[^a-zA-Z0-9_]', '_', name)
+    if s and s[0].isdigit():
+        s = '_' + s
+    return s.lower()
+
 def load_json(path: Path, logger: Logger, desc: str) -> dict:
     if not path.is_file():
         logger.error(f"{desc} file not found: {path}")
@@ -89,6 +96,23 @@ def bytes_to_c_array(data: bytes) -> str:
     """Convert bytes to C array initializer string."""
     return ", ".join(f"0x{b:02X}" for b in data)
 
+def bytes_to_c_array_multiline(data: bytes, bytes_per_line: int = 16) -> str:
+    """Convert bytes to C array initializer string with line breaks.
+    
+    Args:
+        data: Raw bytes to convert
+        bytes_per_line: Number of bytes per line (default: 16)
+    
+    Returns:
+        Formatted string with line breaks
+    """
+    lines = []
+    for i in range(0, len(data), bytes_per_line):
+        chunk = data[i:i + bytes_per_line]
+        line = ", ".join(f"0x{b:02X}" for b in chunk)
+        lines.append(line)
+    return ",\n    ".join(lines)
+
 
 def build_item_info(items: List[dict], type_to_code: dict, type_map: dict, logger: Logger) -> List[dict]:
     info_list = []
@@ -111,6 +135,7 @@ def build_item_info(items: List[dict], type_to_code: dict, type_map: dict, logge
             "type_num": type_num,
             "length": length,
             "storages": item.get("storages", []),
+            "comments": item.get("comments", []),
         }
         info_list.append(info)
     return info_list
@@ -161,7 +186,9 @@ def build_readonly_item_info(items: List[dict], type_map: dict, logger: Logger) 
             "c_name": to_c_identifier(name),
             "length": length,
             "readonly_type": readonly_type,
-            "value_bytes": bytes_to_c_array(value_bytes),
+            "value_bytes": bytes_to_c_array_multiline(value_bytes),
+            "value_string": item.get("string_value", ""),
+            "value_path": item.get("file_value", ""),
         })
 
     return readonly_items
@@ -235,24 +262,58 @@ def main():
         logger.info(f"loaded {len(storages)} storages, {len(items_data)} items")
 
     # 1. 构建 Item 详细信息（分配 ID 并计算长度）
-    item_info_list = build_item_info(items_data, type_to_code, type_map, logger)
+    # 过滤掉 disabled storages 中的 items
+    enabled_items_data = []
+    for item in items_data:
+        # 检查 item 的 storage 是否都是 disabled
+        item_storages = item.get("storages", [])
+        all_disabled = True
+        for sname in item_storages:
+            if sname in storages and not storages[sname].get("disabled", False):
+                all_disabled = False
+                break
+        if not all_disabled:
+            enabled_items_data.append(item)
+        elif args.verbose:
+            logger.info(f"skipping item '{item.get('name')}' (all referenced storages are disabled)")
+    
+    item_info_list = build_item_info(enabled_items_data, type_to_code, type_map, logger)
     if not item_info_list:
         logger.error("no valid items found")
         sys.exit(1)
 
-    # 2. 构建存储区列表（分配 ID）
+    # 2. 构建存储区列表（分配 ID）- 过滤 disabled storages
     storage_names = sorted(storages.keys())
     storage_list = []
+    enabled_storage_names = []  # 只包含 enabled 的 storage 名称
     for idx, name in enumerate(storage_names):
+        s_info = storages[name]
+        # 只读 storage 支持 disabled 标志
+        if s_info.get("readonly", False) and s_info.get("disabled", False):
+            if args.verbose:
+                logger.info(f"skipping disabled readonly storage '{name}'")
+            continue
         storage_list.append({
-            "id": idx,
+            "id": len(storage_list),  # 使用连续 ID
             "name": name,
             "c_name": to_c_identifier(name),
-            "size": storages[name].get("size", 0)
+            "size": s_info.get("size", 0),
+            "readonly": s_info.get("readonly", False),
+            "disabled": False,  # 已经过滤，这里都是 enabled
+            "comments": s_info.get("comments", []),
         })
+        enabled_storage_names.append(name)
 
     # 3. 构建布局条目（每个 Storage+Item 组合，考虑对齐）
-    layout_entries = build_layout_entries(storages, item_info_list, type_map)
+    # 只处理 enabled storages
+    enabled_storages = {name: storages[name] for name in enabled_storage_names}
+    layout_entries = build_layout_entries(enabled_storages, item_info_list, type_map)
+
+    # 3.1 对于 readonly storage，size 从 items 计算（而不是声明）
+    for storage in storage_list:
+        if storage["readonly"]:
+            total = sum(e["length"] for e in layout_entries if e["storage_id"] == storage["id"])
+            storage["size"] = total
 
     # 4. 类型枚举
     type_enums = []
@@ -263,26 +324,60 @@ def main():
         })
 
     # 5. 构建只读 item 信息（用于生成 const 数组）
-    readonly_item_list = build_readonly_item_info(items_data, type_map, logger)
+    readonly_item_list = build_readonly_item_info(enabled_items_data, type_map, logger)
 
-    # 6. 构建只读 storage 信息（用于生成 srm_get_readonly_item / srm_get_readonly_storage）
+    # 6. 构建只读 storage 信息（包含 items 和偏移，用于生成单个连续数组）
+    # 只处理 enabled 的 storage
     readonly_storage_list = []
-    for s_name in storage_names:
+    for s_name in enabled_storage_names:
         s_info = storages[s_name]
         if not s_info.get("readonly", False):
             continue
-        s_id = storage_names.index(s_name)
-        # 找到该 storage 中第一个 item
-        first_item_c_name = None
+        # 找到 storage 在 enabled 列表中的 ID
+        s_id = None
+        for s in storage_list:
+            if s["name"] == s_name:
+                s_id = s["id"]
+                break
+        if s_id is None:
+            continue
+        # 收集该 storage 中所有 items 及其偏移
+        items_in_storage = []
         for entry in layout_entries:
             if entry["storage_id"] == s_id:
-                first_item_c_name = entry["item_c_name"]
-                break
+                items_in_storage.append({
+                    "item_c_name": entry["item_c_name"],
+                    "item_name": entry["item_name"],
+                    "offset": entry["offset"],
+                    "length": entry["length"],
+                })
+        # 查找对应 value bytes（用于生成数组内容）
+        total_size = sum(item["length"] for item in items_in_storage)
+        # 合并所有 item 的 bytes，带注释
+        merged_lines = []
+        for item_entry in items_in_storage:
+            # 在 readonly_item_list 中找到对应 item 的 value_bytes
+            for ri in readonly_item_list:
+                if ri["c_name"] == item_entry["item_c_name"]:
+                    # 获取显示文本：string_value 显示字符串，file_value 显示路径
+                    if ri["readonly_type"] == "string_value":
+                        display = f'"{ri["value_string"]}"'
+                    elif ri["readonly_type"] == "file_value":
+                        display = f'"{ri["value_path"]}"'
+                    else:
+                        display = ri["readonly_type"]
+                    # 添加注释行和数据行
+                    merged_lines.append(f"/* [{item_entry['offset']}] {item_entry['item_name']}: {display} */")
+                    merged_lines.append(f"{ri['value_bytes']},")
+                    break
         readonly_storage_list.append({
             "id": s_id,
             "name": s_name,
             "c_name": to_c_identifier(s_name),
-            "first_item_c_name": first_item_c_name,
+            "c_lower_name": to_c_lower_identifier(s_name),
+            "total_size": total_size,
+            "storage_items": items_in_storage,
+            "merged_bytes": "\n    ".join(merged_lines),
         })
 
     context = {
@@ -290,7 +385,6 @@ def main():
         "items": item_info_list,
         "layout_entries": layout_entries,
         "type_enums": type_enums,
-        "readonly_items": readonly_item_list,
         "readonly_storages": readonly_storage_list,
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }

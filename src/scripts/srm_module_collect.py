@@ -7,14 +7,44 @@ import json
 import sys
 from pathlib import Path
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 from src.scripts.srm_log import Logger
 
 PROG_NAME = "srm-module-collect"
 
+def _srm_self_dir() -> Optional[Path]:
+    """Return the SRM root directory (parent of src/scripts/), or None."""
+    try:
+        # __file__ = .../srm/src/scripts/srm_module_collect.py
+        # srm root = parent of src/
+        return Path(__file__).resolve().parent.parent.parent
+    except Exception:
+        return None
+
 def find_module_files(root_dir: Path) -> List[Path]:
-    return list(root_dir.rglob("srm_module.json"))
+    srm_dir = _srm_self_dir()
+
+    # Only exclude SRM's own directory when the scan root is OUTSIDE it.
+    # When root_dir is inside srm_dir (e.g. running tests), don't exclude.
+    exclude_srm = False
+    if srm_dir is not None:
+        try:
+            root_dir.resolve().relative_to(srm_dir)
+        except ValueError:
+            # root_dir is outside srm_dir → submodule scenario → exclude
+            exclude_srm = True
+
+    results: List[Path] = []
+    for p in root_dir.rglob("srm_module.json"):
+        if exclude_srm:
+            try:
+                p.resolve().relative_to(srm_dir)
+                continue  # inside SRM dir — skip
+            except ValueError:
+                pass
+        results.append(p)
+    return results
 
 def load_and_validate_module(file_path: Path) -> Dict[str, Any]:
     try:
@@ -98,10 +128,6 @@ def main():
     if args.verbose:
         logger.verbose(f"found {len(module_files)} srm_module.json files under {root_path}")
 
-    if not module_files:
-        logger.warn("no srm_module.json files found")
-        sys.exit(0)
-
     modules = []
     for file_path in module_files:
         if args.verbose:
@@ -114,15 +140,20 @@ def main():
             logger.error(f"skipping invalid file: {file_path}\n    reason: {e}")
             continue
 
-    if not modules:
+    if not module_files:
+        # No files found at all — warn but succeed (empty project)
+        logger.warn("no srm_module.json files found")
+    elif not modules:
+        # Files existed but all were invalid — error
         logger.error("no valid modules to merge")
         sys.exit(1)
 
-    try:
-        check_duplicate_modules(modules)
-    except ValueError as e:
-        logger.error(f"module name conflict: {e}")
-        sys.exit(1)
+    if modules:
+        try:
+            check_duplicate_modules(modules)
+        except ValueError as e:
+            logger.error(f"module name conflict: {e}")
+            sys.exit(1)
 
     output_path = Path(args.output)
     generate_project_json(root_path, modules, output_path, logger)

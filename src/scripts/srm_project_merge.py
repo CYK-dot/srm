@@ -42,6 +42,7 @@ def resolve(modules: List[Dict], logger: Logger) -> Dict[str, Any]:
             if name in storages:
                 logger.error(f"duplicate storage name '{name}' (from module '{mod_name}')")
                 sys.exit(1)
+            # Pass through disabled flag (only for readonly storages)
             storages[name] = storage
 
         for item in mod.get("items", []):

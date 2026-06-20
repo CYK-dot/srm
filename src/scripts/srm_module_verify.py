@@ -26,8 +26,38 @@ def load_schema(schema_path: Path, logger: Logger) -> dict:
         logger.error(f"cannot load schema file {schema_path}: {e}")
         sys.exit(1)
 
+def _srm_self_dir() -> Optional[Path]:
+    """Return the SRM root directory (parent of src/scripts/), or None."""
+    try:
+        # __file__ = .../srm/src/scripts/srm_module_verify.py
+        # srm root = parent of src/
+        return Path(__file__).resolve().parent.parent.parent
+    except Exception:
+        return None
+
 def find_module_files(root_dir: Path) -> List[Path]:
-    return list(root_dir.rglob("srm_module.json"))
+    srm_dir = _srm_self_dir()
+
+    # Only exclude SRM's own directory when the scan root is OUTSIDE it.
+    # When root_dir is inside srm_dir (e.g. running tests), don't exclude.
+    exclude_srm = False
+    if srm_dir is not None:
+        try:
+            root_dir.resolve().relative_to(srm_dir)
+        except ValueError:
+            # root_dir is outside srm_dir → submodule scenario → exclude
+            exclude_srm = True
+
+    results: List[Path] = []
+    for p in root_dir.rglob("srm_module.json"):
+        if exclude_srm:
+            try:
+                p.resolve().relative_to(srm_dir)
+                continue  # inside SRM dir — skip
+            except ValueError:
+                pass
+        results.append(p)
+    return results
 
 def validate_json_syntax(file_path: Path) -> Tuple[Optional[dict], Optional[str]]:
     try:

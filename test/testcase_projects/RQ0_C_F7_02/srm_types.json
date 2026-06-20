@@ -1,9 +1,0 @@
-{
-  "types": [
-    {
-      "name": "my-type",
-      "length": 4,
-      "alignment": 4
-    }
-  ]
-}

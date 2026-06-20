@@ -1,9 +1,0 @@
-{
-  "types": [
-    {
-      "name": "default_type",
-      "length": 4,
-      "alignment": 4
-    }
-  ]
-}

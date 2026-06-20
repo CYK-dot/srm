@@ -28,12 +28,73 @@ def run_script(script_name, args, cwd, logger=None):
     env["PYTHONPATH"] = str(project_root) + os.pathsep + env.get("PYTHONPATH", "")
     
     cmd = [sys.executable, str(script_path)] + args
-    print(f"[SRM] Running: {' '.join(cmd)}")
-    print(f"[SRM] Working directory: {cwd}")
     result = subprocess.run(cmd, cwd=str(cwd), env=env)
     if result.returncode != 0:
         print(f"[SRM] ERROR: {script_name} failed with code {result.returncode}")
         sys.exit(result.returncode)
+
+def _write_empty_layout(out_base: Path) -> None:
+    """Generate minimal empty srm_layout.h and srm_layout.c when no modules exist."""
+    out_base.parent.mkdir(parents=True, exist_ok=True)
+    h_path = out_base.with_suffix(".h")
+    c_path = out_base.with_suffix(".c")
+
+    h_content = """\
+/*
+ * srm_layout.h - Auto-generated SRM layout header (empty project)
+ */
+#ifndef SRM_LAYOUT_H
+#define SRM_LAYOUT_H
+
+#include <stdint.h>
+
+/* No modules defined — this is a placeholder file. */
+
+#endif /* SRM_LAYOUT_H */
+"""
+    c_content = """\
+/*
+ * srm_layout.c - Auto-generated SRM layout implementation (empty project)
+ */
+#include "srm.h"
+#include "srm_layout.h"
+#include <stddef.h>
+
+/* No modules defined — stub implementations. */
+
+uint16_t srm_get_offset(uint16_t storage_id, uint16_t item_id)
+{
+    (void)storage_id; (void)item_id;
+    return 0xFFFF;
+}
+
+uint16_t srm_get_storage_size(uint16_t storage_id)
+{
+    (void)storage_id;
+    return 0;
+}
+
+uint16_t srm_get_item_size(uint16_t item_id)
+{
+    (void)item_id;
+    return 0;
+}
+"""
+    with open(h_path, "w", encoding="utf-8") as f:
+        f.write(h_content)
+    with open(c_path, "w", encoding="utf-8") as f:
+        f.write(c_content)
+    print(f"[SRM] Generated empty layout: {h_path}, {c_path}")
+
+def _has_modules(collected_json: Path) -> bool:
+    """Return True if collected.json contains at least one module."""
+    import json
+    try:
+        with open(collected_json, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return bool(data.get("modules"))
+    except Exception:
+        return False
 
 def main():
     parser = argparse.ArgumentParser(description="SRM cross-platform build")
@@ -53,11 +114,20 @@ def main():
     merged_json    = output_dir / "merged.json"
     out_base       = output_dir / "srm_layout"  # 无扩展名
 
+    print()  # 空行分隔
+
     # 1. 验证组件
     run_script("srm_module_verify.py", ["--schema", str(script_dir / "srm_module.schema.json")], cwd=root)
 
     # 2. 收集所有模块
     run_script("srm_module_collect.py", ["-o", str(collected_json)], cwd=root)
+
+    # 2b. 如果没有模块，生成空的输出文件并提前结束
+    if not _has_modules(collected_json):
+        print("[SRM] No modules found, skipping code generation")
+        _write_empty_layout(out_base)
+        print(f"[SRM] Build completed (no modules). Empty files in {output_dir}")
+        return
 
     # 3. 校验项目（全局唯一性等）
     run_script("srm_project_verify.py", [str(collected_json)], cwd=root)
@@ -77,6 +147,7 @@ def main():
     ], cwd=root)
 
     print(f"[SRM] Build completed. Generated files in {output_dir}")
+    print()  # 空行分隔
 
 if __name__ == "__main__":
     main()
