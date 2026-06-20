@@ -1,0 +1,18 @@
+{
+  "module": {
+    "name": "test_module"
+  },
+  "local_storages": [
+    {
+      "name": "test_storage",
+      "size": 64
+    }
+  ],
+  "items": [
+    {
+      "name": "test_item",
+      "data_type": "readwrite_type",
+      "storages": ["test_storage"]
+    }
+  ]
+}

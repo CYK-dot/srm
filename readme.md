@@ -142,6 +142,15 @@ int16_t sensor_read_temperature(void) {
 
 ## 运行测试
 
+### Python 测试
+
+```bash
+cd test/testcase_tests
+pytest python_tests -v
+```
+
+### C 代码测试
+
 ```bash
 cd test
 mkdir -p build && cd build

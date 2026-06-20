@@ -32,6 +32,7 @@ def resolve(modules: List[Dict], logger: Logger) -> Dict[str, Any]:
 
     for mod in modules:
         mod_name = mod["module"]["name"]
+        mod_file = mod.get("_file_path", ".")
 
         for storage in mod.get("local_storages", []):
             name = storage.get("name")
@@ -48,6 +49,18 @@ def resolve(modules: List[Dict], logger: Logger) -> Dict[str, Any]:
             if not name:
                 logger.error(f"module '{mod_name}': item missing 'name'")
                 sys.exit(1)
+            
+            # 解析 file_value 相对路径为绝对路径
+            if "file_value" in item:
+                item_file_path = Path(mod_file).parent / item["file_value"]
+                if not item_file_path.is_file():
+                    logger.error(
+                        f"module '{mod_name}', item '{name}': "
+                        f"file_value path not found: {item_file_path}"
+                    )
+                    sys.exit(1)
+                item["_file_value_resolved"] = str(item_file_path.resolve())
+            
             items.append(item)
 
     # Validate item storage references

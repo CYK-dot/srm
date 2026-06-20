@@ -1,0 +1,9 @@
+{
+  "types": [
+    {
+      "name": "readonly_type",
+      "readonly": true,
+      "alignment": 1
+    }
+  ]
+}

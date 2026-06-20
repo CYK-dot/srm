@@ -75,7 +75,9 @@
             "items": { "type": "string" },
             "uniqueItems": true
           },
-          "format": { "type": "string" }
+          "format": { "type": "string" },
+          "string_value": { "type": "string" },
+          "file_value": { "type": "string" }
         },
         "required": ["name", "storages", "data_type"],
         "allOf": [
@@ -84,7 +86,7 @@
               "properties": { "data_type": { "const": "log" } }
             },
             "then": {
-              "required": ["format"]
+              "required": ["string_value"]
             }
           }
         ],

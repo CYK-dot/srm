@@ -35,13 +35,13 @@ void test_fixed_length_type(void)
 }
 
 /**
- * 测试length_strip类型
+ * 测试只读类型（readonly）
  */
 void test_length_strip_type(void)
 {
-    // 当item使用length_strip类型时，应该根据format字段计算length
+    // 当item使用readonly类型时，应该根据string_value字段计算length
     #ifdef SRM_ITEM_LOG_MSG_ID
-    // log类型，format="Hello %d" (8字节)
+    // log类型，string_value="Hello %d" (8字节)
     TEST_ASSERT_EQUAL_UINT16(8, srm_get_item_size(SRM_ITEM_LOG_MSG_ID));
     #endif
 }

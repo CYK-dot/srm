@@ -56,52 +56,68 @@ cmake --build .
 ctest -V
 
 # 运行单个测试
-ctest -R test_c_f1_01_type_enum_single -V
+ctest -R test_rq0_c_f7_01_type_enum_single -V
 
 # 运行特定功能点的所有测试
-ctest -R test_c_f1 -V
+ctest -R test_rq0_c_f7 -V
 ```
 
-## 测试用例列表
+## 功能点编号映射
+
+### RQ0 测试（初始功能）
 
 | 测试名称 | 功能点 | 验证内容 |
 |----------|--------|----------|
-| test_c_f1_01_type_enum_single | F1 | 单个类型枚举 |
-| test_c_f1_02_type_enum_hyphen | F1 | 连字符类型名转换 |
-| test_c_f1_03_type_enum_digit_start | F1 | 数字开头类型名 |
-| test_c_f1_04_type_enum_multiple | F1 | 多个类型枚举 |
-| test_c_f2_01_storage_macros | F2 | Storage ID 和 SIZE 宏 |
-| test_c_f2_02_storage_hyphen | F2 | 连字符 Storage 名 |
-| test_c_f2_03_storage_digit_start | F2 | 数字开头 Storage 名 |
-| test_c_f2_04_storage_no_size | F2 | 无 size 字段的 Storage |
-| test_c_f2_05_storage_multiple | F2 | 多个 Storage |
-| test_c_f3_01_item_macros | F3 | Item ID 和 TYPE 宏 |
-| test_c_f3_02_item_hyphen | F3 | 连字符 Item 名 |
-| test_c_f3_03_item_digit_start | F3 | 数字开头 Item 名 |
-| test_c_f3_04_item_multiple | F3 | 多个 Item |
-| test_c_f4_01_offset_first_item | F4 | 第一个 Item 偏移量为 0 |
-| test_c_f4_02_offset_no_align | F4 | 无对齐偏移量计算 |
-| test_c_f4_03_offset_aligned | F4 | 已对齐偏移量计算 |
-| test_c_f4_04_offset_need_padding | F4 | 需要填充的偏移量 |
-| test_c_f5_01_offset_item_not_in_storage | F5 | Item 不在 Storage 中 |
-| test_c_f5_02_offset_invalid_storage | F5 | 无效 Storage ID |
-| test_c_f5_03_offset_invalid_item | F5 | 无效 Item ID |
-| test_c_f6_01_storage_size_valid | F6 | 有效 Storage Size |
-| test_c_f6_02_storage_size_no_size | F6 | 无 Size 字段 |
-| test_c_f6_03_storage_size_invalid | F6 | 无效 Storage ID |
-| test_c_f7_01_item_size_fixed | F7 | 固定长度类型 |
-| test_c_f7_02_item_size_strip | F7 | 动态长度类型 |
-| test_c_f7_03_item_size_invalid | F7 | 无效 Item ID |
-| test_c_f8_01_name_alphanumeric | F8 | 纯字母数字名称 |
-| test_c_f8_02_name_digit_start | F8 | 数字开头名称 |
-| test_c_f8_03_name_hyphen | F8 | 连字符名称 |
-| test_c_f8_04_name_space | F8 | 空格名称 |
-| test_c_f8_05_name_special_char | F8 | 特殊字符名称 |
-| test_c_f9_01_align4_already_aligned | F9 | 4字节对齐已对齐 |
-| test_c_f9_02_align8_already_aligned | F9 | 8字节对齐已对齐 |
-| test_c_f9_03_align4_need_padding | F9 | 4字节对齐需要填充 |
-| test_c_f9_04_align8_need_padding | F9 | 8字节对齐需要填充 |
-| test_c_f10_srm_interface | F10 | SRM接口分离测试（target_link_srm_library + target_link_srm_interface） |
+| test_rq0_c_f7_01_type_enum_single | F7 | 单个类型枚举 |
+| test_rq0_c_f7_02_type_enum_hyphen | F7 | 连字符类型名转换 |
+| test_rq0_c_f7_03_type_enum_digit_start | F7 | 数字开头类型名 |
+| test_rq0_c_f7_04_type_enum_multiple | F7 | 多个类型枚举 |
+| test_rq0_c_f8_01_storage_macros | F8 | Storage ID 和 SIZE 宏 |
+| test_rq0_c_f8_02_storage_hyphen | F8 | 连字符 Storage 名 |
+| test_rq0_c_f8_03_storage_digit_start | F8 | 数字开头 Storage 名 |
+| test_rq0_c_f8_04_storage_no_size | F8 | 无 size 字段的 Storage |
+| test_rq0_c_f8_05_storage_multiple | F8 | 多个 Storage |
+| test_rq0_c_f9_01_item_macros | F9 | Item ID 和 TYPE 宏 |
+| test_rq0_c_f9_02_item_hyphen | F9 | 连字符 Item 名 |
+| test_rq0_c_f9_03_item_digit_start | F9 | 数字开头 Item 名 |
+| test_rq0_c_f9_04_item_multiple | F9 | 多个 Item |
+| test_rq0_c_f10_01_offset_first_item | F10 | 第一个 Item 偏移量为 0 |
+| test_rq0_c_f10_02_offset_no_align | F10 | 无对齐偏移量计算 |
+| test_rq0_c_f10_03_offset_aligned | F10 | 已对齐偏移量计算 |
+| test_rq0_c_f10_04_offset_need_padding | F10 | 需要填充的偏移量 |
+| test_rq0_c_f11_01_offset_item_not_in_storage | F11 | Item 不在 Storage 中 |
+| test_rq0_c_f11_02_offset_invalid_storage | F11 | 无效 Storage ID |
+| test_rq0_c_f11_03_offset_invalid_item | F11 | 无效 Item ID |
+| test_rq0_c_f12_01_storage_size_valid | F12 | 有效 Storage Size |
+| test_rq0_c_f12_02_storage_size_no_size | F12 | 无 Size 字段 |
+| test_rq0_c_f12_03_storage_size_invalid | F12 | 无效 Storage ID |
+| test_rq0_c_f13_01_item_size_fixed | F13 | 固定长度类型 |
+| test_rq0_c_f13_02_item_size_readonly | F13 | Readonly 类型长度 |
+| test_rq0_c_f13_03_item_size_invalid | F13 | 无效 Item ID |
+| test_rq0_c_f14_01_name_alphanumeric | F14 | 纯字母数字名称 |
+| test_rq0_c_f14_02_name_digit_start | F14 | 数字开头名称 |
+| test_rq0_c_f14_03_name_hyphen | F14 | 连字符名称 |
+| test_rq0_c_f14_04_name_space | F14 | 空格名称 |
+| test_rq0_c_f14_05_name_special_char | F14 | 特殊字符名称 |
+| test_rq0_c_f15_01_align4_already_aligned | F15 | 4字节对齐已对齐 |
+| test_rq0_c_f15_02_align8_already_aligned | F15 | 8字节对齐已对齐 |
+| test_rq0_c_f15_03_align4_need_padding | F15 | 4字节对齐需要填充 |
+| test_rq0_c_f15_04_align8_need_padding | F15 | 8字节对齐需要填充 |
+| test_rq0_c_f16_srm_interface | F16 | SRM接口分离测试 |
+
+### RQ1 测试（srm支持静态只读资源）
+
+| 测试名称 | 功能点 | 验证内容 |
+|----------|--------|----------|
+| test_rq1_c_f6_01_readonly_item_valid | F6 | Readonly item 返回正确指针 |
+| test_rq1_c_f6_02_readonly_item_invalid_item | F6 | 无效 item_id 返回 NULL |
+| test_rq1_c_f6_03_readonly_item_invalid_storage | F6 | readwrite item 返回 NULL |
+| test_rq1_c_f7_01_readonly_storage_valid | F7 | Readonly storage 返回正确指针 |
+| test_rq1_c_f7_02_readonly_storage_invalid | F7 | 无效 storage_id 返回 NULL |
+| test_rq1_c_f7_03_readwrite_storage_returns_null | F7 | readwrite storage 返回 NULL |
+| test_rq1_c_f8_01_offset_readonly_valid | F8 | Readonly storage 偏移量正确 |
+| test_rq1_c_f8_02_offset_readwrite_compatible | F8 | Readwrite storage 向后兼容 |
+| test_rq1_c_f8_03_offset_readonly_item_not_in_storage | F8 | Item 不在 storage 中返回 0xFFFF |
 
 ## 测试输出示例
 

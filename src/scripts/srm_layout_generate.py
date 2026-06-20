@@ -56,7 +56,25 @@ def compute_item_length(item: dict, type_map: dict, logger: Logger) -> Optional[
         return None
 
     type_def = type_map[data_type]
+    readonly = type_def.get("readonly", False)
 
+    # 只读类型：从 string_value 或 file_value 计算长度
+    if readonly:
+        if "string_value" in item:
+            return len(item["string_value"].encode("utf-8"))
+        elif "_file_value_resolved" in item:
+            file_path = item["_file_value_resolved"]
+            try:
+                with open(file_path, "rb") as f:
+                    return len(f.read())
+            except Exception as e:
+                logger.error(f"item '{name}': cannot read file_value '{file_path}': {e}")
+                return None
+        else:
+            logger.error(f"item '{name}': readonly type requires 'string_value' or 'file_value'")
+            return None
+
+    # 读写类型：必须有 length
     if "length" in type_def:
         length = type_def["length"]
         if isinstance(length, int):
@@ -64,23 +82,13 @@ def compute_item_length(item: dict, type_map: dict, logger: Logger) -> Optional[
         logger.error(f"type '{data_type}': 'length' must be integer")
         return None
 
-    if "length_strip" in type_def:
-        expr = type_def["length_strip"]
-        if not expr.startswith("${") or not expr.endswith("}"):
-            logger.error(f"type '{data_type}': unsupported length_strip expression '{expr}'")
-            return None
-        field_name = expr[2:-1]
-        if field_name not in item:
-            logger.error(f"item '{name}': missing field '{field_name}' for length_strip")
-            return None
-        value = item[field_name]
-        if isinstance(value, str):
-            return len(value.encode("utf-8"))
-        logger.error(f"item '{name}': field '{field_name}' must be string")
-        return None
-
-    logger.error(f"type '{data_type}': missing 'length' or 'length_strip'")
+    logger.error(f"type '{data_type}': missing 'length'")
     return None
+
+def bytes_to_c_array(data: bytes) -> str:
+    """Convert bytes to C array initializer string."""
+    return ", ".join(f"0x{b:02X}" for b in data)
+
 
 def build_item_info(items: List[dict], type_to_code: dict, type_map: dict, logger: Logger) -> List[dict]:
     info_list = []
@@ -106,6 +114,57 @@ def build_item_info(items: List[dict], type_to_code: dict, type_map: dict, logge
         }
         info_list.append(info)
     return info_list
+
+
+def build_readonly_item_info(items: List[dict], type_map: dict, logger: Logger) -> List[dict]:
+    """
+    Build info for readonly items that need const arrays in generated code.
+    """
+    readonly_items = []
+    for item in items:
+        name = item.get("name")
+        if not name:
+            continue
+        data_type = item.get("data_type")
+        if not data_type or data_type not in type_map:
+            continue
+
+        type_def = type_map[data_type]
+        if not type_def.get("readonly", False):
+            continue
+
+        length = compute_item_length(item, type_map, logger)
+        if length is None:
+            continue
+
+        # Read the value bytes
+        value_bytes = b""
+        readonly_type = None
+        if "string_value" in item:
+            value_bytes = item["string_value"].encode("utf-8")
+            readonly_type = "string_value"
+        elif "_file_value_resolved" in item:
+            file_path = item["_file_value_resolved"]
+            try:
+                with open(file_path, "rb") as f:
+                    value_bytes = f.read()
+                readonly_type = "file_value"
+            except Exception as e:
+                logger.error(f"item '{name}': cannot read file '{file_path}': {e}")
+                continue
+
+        if not readonly_type:
+            continue
+
+        readonly_items.append({
+            "name": name,
+            "c_name": to_c_identifier(name),
+            "length": length,
+            "readonly_type": readonly_type,
+            "value_bytes": bytes_to_c_array(value_bytes),
+        })
+
+    return readonly_items
 
 def build_layout_entries(storages: dict, items: List[dict], type_map: dict) -> List[dict]:
     """
@@ -203,11 +262,36 @@ def main():
             "code": code
         })
 
+    # 5. 构建只读 item 信息（用于生成 const 数组）
+    readonly_item_list = build_readonly_item_info(items_data, type_map, logger)
+
+    # 6. 构建只读 storage 信息（用于生成 srm_get_readonly_item / srm_get_readonly_storage）
+    readonly_storage_list = []
+    for s_name in storage_names:
+        s_info = storages[s_name]
+        if not s_info.get("readonly", False):
+            continue
+        s_id = storage_names.index(s_name)
+        # 找到该 storage 中第一个 item
+        first_item_c_name = None
+        for entry in layout_entries:
+            if entry["storage_id"] == s_id:
+                first_item_c_name = entry["item_c_name"]
+                break
+        readonly_storage_list.append({
+            "id": s_id,
+            "name": s_name,
+            "c_name": to_c_identifier(s_name),
+            "first_item_c_name": first_item_c_name,
+        })
+
     context = {
         "storages": storage_list,
         "items": item_info_list,
         "layout_entries": layout_entries,
         "type_enums": type_enums,
+        "readonly_items": readonly_item_list,
+        "readonly_storages": readonly_storage_list,
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
 

@@ -27,6 +27,160 @@ def load_json(path: Path, logger: Logger, description: str) -> dict:
         logger.error(f"cannot read {path}: {e}")
         sys.exit(1)
 
+def validate_type_definitions(type_map: dict, logger: Logger) -> bool:
+    """
+    校验 srm_types.json 中类型定义的合法性。
+    
+    合法组合：
+    - readonly=true, 无 length → 只读类型（不定长）
+    - readonly=false/不指定, length 指定 → 读写类型（定长）
+    
+    非法组合：
+    - readonly=true, length 指定 → 定长只读资源非法
+    - readonly=false/不指定, 无 length → 不定长读写资源非法
+    """
+    all_ok = True
+    
+    for type_name, type_def in type_map.items():
+        readonly = type_def.get("readonly", False)
+        has_length = "length" in type_def
+        
+        if readonly and has_length:
+            logger.error(
+                f"type '{type_name}': readonly=true but length is specified, "
+                f"定长只读资源非法"
+            )
+            all_ok = False
+        elif not readonly and not has_length:
+            logger.error(
+                f"type '{type_name}': readonly=false (or unspecified) but no length specified, "
+                f"不定长读写资源非法"
+            )
+            all_ok = False
+    
+    return all_ok
+
+
+def validate_readonly_item_values(items: list, type_map: dict, logger: Logger) -> bool:
+    """
+    校验只读类型的 item 是否提供了 string_value 或 file_value。
+    
+    规则：
+    - 只读类型的 item 必须提供 string_value 或 file_value（二选一）
+    - 不能同时提供 string_value 和 file_value
+    """
+    all_ok = True
+    
+    for item in items:
+        name = item.get("name")
+        data_type = item.get("data_type")
+        
+        if not data_type or data_type not in type_map:
+            continue
+        
+        type_def = type_map[data_type]
+        readonly = type_def.get("readonly", False)
+        
+        if not readonly:
+            continue
+        
+        has_string = "string_value" in item
+        has_file = "file_value" in item
+        
+        if not has_string and not has_file:
+            logger.error(
+                f"item '{name}': readonly type '{data_type}' requires 'string_value' or 'file_value'"
+            )
+            all_ok = False
+        elif has_string and has_file:
+            logger.error(
+                f"item '{name}': cannot have both 'string_value' and 'file_value'"
+            )
+            all_ok = False
+    
+    return all_ok
+
+
+def validate_readwrite_item_values(items: list, type_map: dict, logger: Logger) -> bool:
+    """
+    校验读写类型的 item 是否错误地提供了 string_value 或 file_value。
+    
+    规则：
+    - 读写类型的 item 不允许提供 string_value 或 file_value
+    """
+    all_ok = True
+    
+    for item in items:
+        name = item.get("name")
+        data_type = item.get("data_type")
+        
+        if not data_type or data_type not in type_map:
+            continue
+        
+        type_def = type_map[data_type]
+        readonly = type_def.get("readonly", False)
+        
+        if readonly:
+            continue
+        
+        has_string = "string_value" in item
+        has_file = "file_value" in item
+        
+        if has_string:
+            logger.error(
+                f"item '{name}': readwrite type '{data_type}' cannot have 'string_value'"
+            )
+            all_ok = False
+        if has_file:
+            logger.error(
+                f"item '{name}': readwrite type '{data_type}' cannot have 'file_value'"
+            )
+            all_ok = False
+    
+    return all_ok
+
+
+def validate_storage_item_consistency(items: list, storages: dict, type_map: dict, logger: Logger) -> bool:
+    """
+    校验 item 类型与 storage readonly 属性的一致性。
+    
+    规则：
+    - readonly item 不能放入 readwrite storage
+    - readwrite item 不能放入 readonly storage
+    """
+    all_ok = True
+    
+    for item in items:
+        name = item.get("name")
+        data_type = item.get("data_type")
+        
+        if not data_type or data_type not in type_map:
+            continue
+        
+        type_def = type_map[data_type]
+        item_readonly = type_def.get("readonly", False)
+        
+        for storage_name in item.get("storages", []):
+            if storage_name not in storages:
+                continue
+            
+            storage = storages[storage_name]
+            storage_readonly = storage.get("readonly", False)
+            
+            if item_readonly and not storage_readonly:
+                logger.error(
+                    f"item '{name}': readonly type cannot be in readwrite storage '{storage_name}'"
+                )
+                all_ok = False
+            elif not item_readonly and storage_readonly:
+                logger.error(
+                    f"item '{name}': readwrite type cannot be in readonly storage '{storage_name}'"
+                )
+                all_ok = False
+    
+    return all_ok
+
+
 def get_item_length(item: dict, type_map: dict, logger: Logger) -> Optional[int]:
     name = item.get("name")
     data_type = item.get("data_type")
@@ -39,7 +193,25 @@ def get_item_length(item: dict, type_map: dict, logger: Logger) -> Optional[int]
         return None
 
     type_def = type_map[data_type]
+    readonly = type_def.get("readonly", False)
 
+    # 只读类型：从 string_value 或 file_value 计算长度
+    if readonly:
+        if "string_value" in item:
+            return len(item["string_value"].encode("utf-8"))
+        elif "_file_value_resolved" in item:
+            file_path = item["_file_value_resolved"]
+            try:
+                with open(file_path, "rb") as f:
+                    return len(f.read())
+            except Exception as e:
+                logger.error(f"item '{name}': cannot read file_value '{file_path}': {e}")
+                return None
+        else:
+            logger.error(f"item '{name}': readonly type requires 'string_value' or 'file_value'")
+            return None
+
+    # 读写类型：必须有 length
     if "length" in type_def:
         length = type_def["length"]
         if isinstance(length, int):
@@ -47,22 +219,7 @@ def get_item_length(item: dict, type_map: dict, logger: Logger) -> Optional[int]
         logger.error(f"type '{data_type}': 'length' must be integer")
         return None
 
-    if "length_strip" in type_def:
-        expr = type_def["length_strip"]
-        if not expr.startswith("${") or not expr.endswith("}"):
-            logger.error(f"type '{data_type}': unsupported length_strip expression '{expr}'")
-            return None
-        field_name = expr[2:-1]
-        if field_name not in item:
-            logger.error(f"item '{name}': missing field '{field_name}' for length_strip")
-            return None
-        value = item[field_name]
-        if isinstance(value, str):
-            return len(value.encode("utf-8"))
-        logger.error(f"item '{name}': field '{field_name}' must be string")
-        return None
-
-    logger.error(f"type '{data_type}': missing 'length' or 'length_strip'")
+    logger.error(f"type '{data_type}': missing 'length'")
     return None
 
 def simulate_insertion(
@@ -166,6 +323,11 @@ def main():
         sys.exit(1)
     type_map = {entry["name"]: entry for entry in types_data["types"] if "name" in entry}
 
+    # 校验类型定义的合法性
+    if not validate_type_definitions(type_map, logger):
+        logger.error("type definition validation failed")
+        sys.exit(1)
+
     resolved = load_json(Path(args.resolved), logger, "Resolved")
     if "storages" not in resolved or "items" not in resolved:
         logger.error("resolved file must contain 'storages' and 'items' keys")
@@ -176,6 +338,21 @@ def main():
 
     if args.verbose:
         logger.info(f"loaded {len(storages)} storages, {len(items)} items")
+
+    # 校验只读 item 的值约束
+    if not validate_readonly_item_values(items, type_map, logger):
+        logger.error("readonly item value validation failed")
+        sys.exit(1)
+
+    # 校验读写 item 的值约束
+    if not validate_readwrite_item_values(items, type_map, logger):
+        logger.error("readwrite item value validation failed")
+        sys.exit(1)
+
+    # 校验 storage-item 一致性
+    if not validate_storage_item_consistency(items, storages, type_map, logger):
+        logger.error("storage-item consistency validation failed")
+        sys.exit(1)
 
     # Compute length for each item
     item_lengths = {}

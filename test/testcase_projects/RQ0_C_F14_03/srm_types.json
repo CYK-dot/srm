@@ -1,0 +1,10 @@
+{
+  "types": [
+    {
+      "name": "readwrite_type",
+      "readonly": false,
+      "length": 4,
+      "alignment": 4
+    }
+  ]
+}

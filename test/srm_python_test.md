@@ -4,26 +4,31 @@
 
 ---
 
-## 1. 功能点总览表
+## 功能点编号映射
 
-| 功能点编号 | 功能点描述 | 断言示例 |
-|------------|------------|----------|
-| F1 | 模块 JSON Schema 校验 | 当 srm_module.json 不符合 schema 时，构建应该失败 |
-| F2 | 模块收集与模块名冲突检测 | 当多个 srm_module.json 中存在同名模块时，应该报错并终止 |
-| F3 | 全局名称唯一性校验 | 当不同模块的 local_storages.name 重复时，应该报错 |
-| F4 | 引用完整性校验 | 当 external_storages 引用的 source_module 不存在时，应该报错 |
-| F5 | 项目合并为扁平结构 | 当所有校验通过时，应该生成包含全部 storages 和 items 的 resolved JSON |
-| F6 | 布局容量校验（含对齐） | 当 items 总长度（含对齐填充）超过 storage 容量时，应该报错 |
+| RQ | 功能点编号 | 功能点描述 |
+|----|-----------|-----------|
+| RQ0 (初始功能) | F1 | 模块 JSON Schema 校验 |
+| RQ0 | F2 | 模块收集与模块名冲突检测 |
+| RQ0 | F3 | 全局名称唯一性校验 |
+| RQ0 | F4 | 引用完整性校验 |
+| RQ0 | F5 | 项目合并为扁平结构 |
+| RQ0 | F6 | 布局容量校验（含对齐） |
+| RQ1 (静态只读资源) | F1 | 静态只读资源类型验证 |
+| RQ1 | F2 | 静态只读资源 item value 验证 |
+| RQ1 | F3 | 静态只读资源 storage-item 一致性 |
+| RQ1 | F4 | 静态只读资源数组支持 |
+| RQ1 | F5 | 静态只读资源文件值支持 |
 
 ---
 
-## 2. 针对每个功能点的详细设计
+## 1. RQ0 功能点详细设计
 
 ---
 
-### F1 - 模块 JSON Schema 校验
+### RQ0-F1 - 模块 JSON Schema 校验
 
-**功能描述**：递归扫描目录下所有 `srm_module.json` 文件，使用 `srm_module.schema.json` 进行 JSON Schema (Draft-7) 校验。校验内容包括必填字段、字段类型、`data_type` 为 `log` 时必须提供 `format` 字段等。
+**功能描述**：递归扫描目录下所有 `srm_module.json` 文件，使用 `srm_module.schema.json` 进行 JSON Schema (Draft-7) 校验。校验内容包括必填字段、字段类型、`data_type` 为 `log` 时必须提供 `string_value` 字段等。
 
 **影响维度及等价类分析**
 
@@ -34,7 +39,7 @@
 | D3: local_storages / external_storages 至少存在一个 | D3-1: 至少有其一; D3-2: 两者均缺失 |
 | D4: local_storages[].name 字段 | D4-1: 存在; D4-2: 缺失 |
 | D5: items[]. 必填字段 (name, storages, data_type) | D5-1: 全部存在; D5-2: 缺少 name; D5-3: 缺少 storages; D5-4: 缺少 data_type |
-| D6: items[].data_type 与 format 字段 | D6-1: data_type=log 且 format 存在; D6-2: data_type=log 但 format 缺失; D6-3: data_type=counter/measure（无 format 要求） |
+| D6: items[].data_type 与 string_value 字段 | D6-1: data_type=log 且 string_value 存在; D6-2: data_type=log 但 string_value 缺失; D6-3: data_type=counter/measure（无 string_value 要求） |
 | D7: data_type 枚举值合法性 | D7-1: 合法值 (log/counter/measure); D7-2: 不在枚举中的值 |
 | D8: 目录下模块文件数量 | D8-1: 存在至少一个 srm_module.json; D8-2: 无任何 srm_module.json |
 
@@ -51,8 +56,8 @@ D1: JSON 语法
 │   │   │   │   │   │   ├── D4-1 (存在)
 │   │   │   │   │   │   │   ├── D5: items 必填字段
 │   │   │   │   │   │   │   │   ├── D5-1 (全部存在)
-│   │   │   │   │   │   │   │   │   ├── D6-1 (log+format) → TC-F1-01
-│   │   │   │   │   │   │   │   │   ├── D6-2 (log 无 format) → TC-F1-02
+│   │   │   │   │   │   │   │   │   ├── D6-1 (log+string_value) → TC-F1-01
+│   │   │   │   │   │   │   │   │   ├── D6-2 (log 无 string_value) → TC-F1-02
 │   │   │   │   │   │   │   │   │   ├── D6-3 (counter/measure) → TC-F1-03
 │   │   │   │   │   │   │   │   ├── D5-2 (缺少 name) → TC-F1-04
 │   │   │   │   │   │   │   │   ├── D5-3 (缺少 storages) → TC-F1-05
@@ -75,9 +80,9 @@ D8: 文件数量（独立分支，不影响 Schema 内部校验）
 
 | 用例编号 | 前置条件 | 输入组合 | 预期结果 |
 |----------|----------|----------|----------|
-| TC-F1-01 | 根目录下有一个 srm_module.json | JSON 语法正确, module.name="sensor", local_storages 含 name, items 含 name+storages+data_type="log"+format | 校验通过，退出码 0 |
-| TC-F1-02 | 根目录下有一个 srm_module.json | JSON 语法正确, items 中 data_type="log" 但无 format 字段 | 校验失败，退出码非 0，错误信息包含 "format" |
-| TC-F1-03 | 根目录下有一个 srm_module.json | items 中 data_type="counter"（无 format 要求） | 校验通过，退出码 0 |
+| TC-F1-01 | 根目录下有一个 srm_module.json | JSON 语法正确, module.name="sensor", local_storages 含 name, items 含 name+storages+data_type="log"+string_value | 校验通过，退出码 0 |
+| TC-F1-02 | 根目录下有一个 srm_module.json | JSON 语法正确, items 中 data_type="log" 但无 string_value 字段 | 校验失败，退出码非 0，错误信息包含 "string_value" |
+| TC-F1-03 | 根目录下有一个 srm_module.json | items 中 data_type="counter"（无 string_value 要求） | 校验通过，退出码 0 |
 | TC-F1-04 | 根目录下有一个 srm_module.json | items 中某项缺少 name 字段 | 校验失败，退出码非 0 |
 | TC-F1-05 | 根目录下有一个 srm_module.json | items 中某项缺少 storages 字段 | 校验失败，退出码非 0 |
 | TC-F1-06 | 根目录下有一个 srm_module.json | items 中某项缺少 data_type 字段 | 校验失败，退出码非 0 |
@@ -91,7 +96,7 @@ D8: 文件数量（独立分支，不影响 Schema 内部校验）
 
 ---
 
-### F2 - 模块收集与模块名冲突检测
+### RQ0-F2 - 模块收集与模块名冲突检测
 
 **功能描述**：递归扫描目录下所有 `srm_module.json`，加载并校验基础结构（module.name 存在），然后检查模块名全局唯一性，最终生成 `srm_project.json`。
 
@@ -133,7 +138,7 @@ D1: 文件数量
 
 ---
 
-### F3 - 全局名称唯一性校验
+### RQ0-F3 - 全局名称唯一性校验
 
 **功能描述**：对收集后的 `srm_project.json` 进行全局唯一性检查：不同模块之间的 `local_storages.name` 不能重复，不同模块之间的 `items.name` 不能重复。
 
@@ -168,9 +173,9 @@ D1: local_storages.name 跨模块
 
 ---
 
-### F4 - 引用完整性校验
+### RQ0-F4 - 引用完整性校验
 
-**功能描述**：校验 `srm_project.json` 中模块间引用的合法性，包括：external_storages 的 source_module 必须存在、external alias 不与本模块 local storage 册突、external alias 在目标模块中必须存在、items 引用的 storage 必须在本模块已定义（本地或外部）、items 的 storages 列表不能为空。
+**功能描述**：校验 `srm_project.json` 中模块间引用的合法性，包括：external_storages 的 source_module 必须存在、external alias 不与本模块 local storage 冲突、external alias 在目标模块中必须存在、items 引用的 storage 必须在本模块已定义（本地或外部）、items 的 storages 列表不能为空。
 
 **影响维度及等价类分析**
 
@@ -219,7 +224,7 @@ D1: source_module 存在性
 
 ---
 
-### F5 - 项目合并为扁平结构
+### RQ0-F5 - 项目合并为扁平结构
 
 **功能描述**：将通过所有校验的 `srm_project.json` 合并为扁平的 `srm_resolved.json`，包含 `storages`（以 name 为 key 的字典）和 `items`（列表）。
 
@@ -254,9 +259,9 @@ D1: 模块数量
 
 ---
 
-### F6 - 布局容量校验（含对齐）
+### RQ0-F6 - 布局容量校验（含对齐）
 
-**功能描述**：对 `srm_resolved.json` 中的每个 storage，按 items 顺序模拟插入，考虑类型对齐（alignment），验证总字节数不超过 storage.size。同时校验 items 的 data_type 在 `srm_types.json` 中存在，以及 `length_strip` 表达式引用的字段有效。
+**功能描述**：对 `srm_resolved.json` 中的每个 storage，按 items 顺序模拟插入，考虑类型对齐（alignment），验证总字节数不超过 storage.size。同时校验 items 的 data_type 在 `srm_types.json` 中存在，以及 item 中的 `string_value`/`file_value` 字段有效。
 
 **影响维度及等价类分析**
 
@@ -266,8 +271,8 @@ D1: 模块数量
 | D2: items 总长度 vs storage 容量 | D2-1: 未溢出; D2-2: 溢出 |
 | D3: 对齐（alignment）影响 | D3-1: alignment=1（无填充）; D3-2: alignment>1（有填充，可能增加总长度） |
 | D4: data_type 在 types.json 中是否存在 | D4-1: 存在; D4-2: 不存在 |
-| D5: 类型定义方式 | D5-1: 使用固定 length; D5-2: 使用 length_strip 表达式 |
-| D6: length_strip 引用的字段 | D6-1: 字段存在且为字符串; D6-2: 字段不存在; D6-3: 字段存在但非字符串 |
+| D5: 类型定义方式 | D5-1: 使用固定 length; D5-2: 使用 string_value 或 file_value |
+| D6: string_value/file_value 引用的字段 | D6-1: 字段存在且有效; D6-2: 字段缺失; D6-3: 字段类型错误 |
 
 **树形拆分结构**
 
@@ -286,10 +291,10 @@ D4: data_type 存在性
 │   │   │   │   │   │       ├── D2-1 (未溢出，含填充) → TC-F6-03
 │   │   │   │   │   │       └── D2-2 (因填充导致溢出) → TC-F6-04
 │   │   │   │   └── D1-2 (无 size) → TC-F6-05
-│   │   └── D5-2 (length_strip)
-│   │       ├── D6-1 (字段存在且为字符串) → TC-F6-06
-│   │       ├── D6-2 (字段不存在) → TC-F6-07
-│   │       └── D6-3 (字段非字符串) → TC-F6-08
+│   │   └── D5-2 (string_value/file_value)
+│   │       ├── D6-1 (字段存在且有效) → TC-F6-06
+│   │       ├── D6-2 (字段缺失) → TC-F6-07
+│   │       └── D6-3 (字段类型错误) → TC-F6-08
 └── D4-2 (不存在) → TC-F6-09
 ```
 
@@ -302,62 +307,178 @@ D4: data_type 存在性
 | TC-F6-03 | storage "buf" size=16, item "a" length=5 alignment=4 (offset=0, uses 5), item "b" length=4 alignment=4 (对齐到 offset=8, uses 12) | D4-1, D5-1, D1-1, D3-2, D2-1 | 校验通过（总使用 12 ≤ 16），退出码 0 |
 | TC-F6-04 | storage "buf" size=10, item "a" length=5 alignment=4 (uses 5), item "b" length=4 alignment=4 (对齐到 8, 需要 8+4=12 > 10) | D4-1, D5-1, D1-1, D3-2, D2-2 | 报错 "could not insert" (因对齐填充导致溢出)，退出码 1 |
 | TC-F6-05 | storage 无 size 字段，item 任意 | D4-1, D5-1, D1-2 | 跳过容量检查，校验通过，退出码 0 |
-| TC-F6-06 | type "log" 定义为 length_strip="${format}", item 含 format="Hello %d" (8 字节 UTF-8) | D4-1, D5-2, D6-1 | 正确计算长度为 8，继续容量校验 |
-| TC-F6-07 | type "log" 定义为 length_strip="${format}", item 缺少 format 字段 | D4-1, D5-2, D6-2 | 报错 "missing field 'format' for length_strip"，退出码 1 |
-| TC-F6-08 | type "log" 定义为 length_strip="${format}", item 的 format 字段为整数 123 | D4-1, D5-2, D6-3 | 报错 "field 'format' must be string"，退出码 1 |
+| TC-F6-06 | type "log" 使用 string_value, item 含 string_value="Hello" (5 字节) | D4-1, D5-2, D6-1 | 正确计算长度为 5，继续容量校验 |
+| TC-F6-07 | type "log" 使用 string_value, item 缺少 string_value 字段 | D4-1, D5-2, D6-2 | 报错 "missing string_value for log type"，退出码 1 |
+| TC-F6-08 | type "log" 使用 string_value, item 的 string_value 字段为整数 123 | D4-1, D5-2, D6-3 | 报错 "string_value must be string"，退出码 1 |
 | TC-F6-09 | item 的 data_type="unknown_type"，该类型不在 srm_types.json 中 | D4-2 | 报错 "unknown data_type 'unknown_type'"，退出码 1 |
+
+---
+
+## 2. RQ1 功能点详细设计（srm支持静态只读资源）
+
+---
+
+### RQ1-F1 - 静态只读资源类型验证
+
+**功能描述**：验证 `log` 类型的 item 必须提供 `string_value` 字段，且 storage 的 `readonly` 属性与 item 的值类型一致。
+
+**影响维度及等价类分析**
+
+| 维度 | 等价类/场景 |
+|------|-------------|
+| D1: item 的 data_type | D1-1: log 类型; D1-2: counter/measure 类型 |
+| D2: string_value 字段 | D2-1: 存在且为字符串; D2-2: 缺失; D2-3: 非字符串 |
+| D3: storage readonly 属性 | D3-1: readonly=true; D3-2: readonly=false 或未设置 |
+
+**测试用例列表**
+
+| 用例编号 | 前置条件 | 输入组合 | 预期结果 |
+|----------|----------|----------|----------|
+| TC-F1-01 | log 类型 item，storage readonly=true | D1-1, D2-1, D3-1 | 校验通过，退出码 0 |
+| TC-F1-02 | log 类型 item，缺少 string_value | D1-1, D2-2, D3-1 | 校验失败，退出码非 0 |
+| TC-F1-03 | counter 类型 item，无 string_value 要求 | D1-2, D3-2 | 校验通过，退出码 0 |
+| TC-F1-04 | log 类型 item，string_value 为整数 | D1-1, D2-3, D3-1 | 校验失败，退出码非 0 |
+
+---
+
+### RQ1-F2 - 静态只读资源 item value 验证
+
+**功能描述**：验证 readonly storage 中的 item 的 `string_value` 字段在生成代码时被正确使用。
+
+**测试用例列表**
+
+| 用例编号 | 前置条件 | 输入组合 | 预期结果 |
+|----------|----------|----------|----------|
+| TC-F2-01 | log 类型 item，string_value="Hello World" | string_value 存在 | 生成代码包含正确的字符串值 |
+| TC-F2-02 | log 类型 item，string_value 为空字符串 | string_value="" | 生成代码包含空字符串 |
+| TC-F2-03 | log 类型 item，string_value 含特殊字符 | string_value 含转义字符 | 生成代码正确处理转义 |
+| TC-F2-04 | log 类型 item，string_value 含中文 | string_value="你好" | 生成代码正确处理 UTF-8 |
+
+---
+
+### RQ1-F3 - 静态只读资源 storage-item 一致性
+
+**功能描述**：验证 readonly storage 中的 item 必须是 log 类型（string_value），readwrite storage 中的 item 不能是 log 类型。
+
+**测试用例列表**
+
+| 用例编号 | 前置条件 | 输入组合 | 预期结果 |
+|----------|----------|----------|----------|
+| TC-F3-01 | readonly storage + log item | storage.readonly=true, item.data_type=log | 校验通过 |
+| TC-F3-02 | readonly storage + counter item | storage.readonly=true, item.data_type=counter | 校验失败 |
+| TC-F3-03 | readwrite storage + counter item | storage.readonly=false, item.data_type=counter | 校验通过 |
+| TC-F3-04 | readwrite storage + log item | storage.readonly=false, item.data_type=log | 校验失败 |
+| TC-F3-05 | readonly storage + file item | storage.readonly=true, item.data_type=file | 校验通过 |
+| TC-F3-06 | readwrite storage + file item | storage.readonly=false, item.data_type=file | 校验失败 |
+| TC-F3-07 | 无 readonly 属性的 storage + counter item | storage 无 readonly 字段, item.data_type=counter | 校验通过（默认为 readwrite） |
+
+---
+
+### RQ1-F4 - 静态只读资源数组支持
+
+**功能描述**：验证 readonly storage 支持数组类型的 item，数组长度在生成代码时正确计算。
+
+**测试用例列表**
+
+| 用例编号 | 前置条件 | 输入组合 | 预期结果 |
+|----------|----------|----------|----------|
+| TC-F4-01 | log 类型数组 item，长度 10 | string_value="A"*10 | 生成代码数组长度为 10 |
+| TC-F4-02 | log 类型数组 item，长度 0 | string_value="" | 生成代码数组长度为 0 |
+
+---
+
+### RQ1-F5 - 静态只读资源文件值支持
+
+**功能描述**：验证 `file_value` 字段支持从外部文件读取内容作为 readonly item 的值。
+
+**测试用例列表**
+
+| 用例编号 | 前置条件 | 输入组合 | 预期结果 |
+|----------|----------|----------|----------|
+| TC-F5-01 | log 类型 item，file_value="data.bin" | file_value 指向存在的文件 | 生成代码包含文件内容 |
+| TC-F5-02 | log 类型 item，file_value 指向不存在的文件 | file_value="nonexistent.bin" | 校验失败，退出码非 0 |
 
 ---
 
 ## 3. 总测试用例汇总表
 
+### RQ0 测试用例（初始功能）
+
 | 用例编号 | 功能点 | 简要描述 |
 |----------|--------|----------|
-| TC-F1-01 | F1 | 合法模块含 log 类型且有 format，校验通过 |
-| TC-F1-02 | F1 | log 类型缺少 format，校验失败 |
-| TC-F1-03 | F1 | counter 类型无 format 要求，校验通过 |
-| TC-F1-04 | F1 | item 缺少 name，校验失败 |
-| TC-F1-05 | F1 | item 缺少 storages，校验失败 |
-| TC-F1-06 | F1 | item 缺少 data_type，校验失败 |
-| TC-F1-07 | F1 | local_storage 缺少 name，校验失败 |
-| TC-F1-08 | F1 | 无 local_storages 且无 external_storages，校验失败 |
-| TC-F1-09 | F1 | module 缺少 name，校验失败 |
-| TC-F1-10 | F1 | module.name 为非字符串，校验失败 |
-| TC-F1-11 | F1 | data_type 不在枚举中，校验失败 |
-| TC-F1-12 | F1 | JSON 语法错误，校验失败 |
-| TC-F1-13 | F1 | 无模块文件，警告退出 |
-| TC-F2-01 | F2 | 无模块文件，警告退出 |
-| TC-F2-02 | F2 | 单个合法模块，收集成功 |
-| TC-F2-03 | F2 | 单个非法模块（缺 name），收集失败 |
-| TC-F2-04 | F2 | 多个合法模块名不同，收集成功 |
-| TC-F2-05 | F2 | 多模块中有非法文件，跳过后处理 |
-| TC-F2-06 | F2 | 多模块同名，报错退出 |
-| TC-F3-01 | F3 | 全局唯一性通过 |
-| TC-F3-02 | F3 | items.name 跨模块冲突 |
-| TC-F3-03 | F3 | local_storages.name 跨模块冲突 |
-| TC-F3-04 | F3 | storage 和 item 名均有冲突 |
-| TC-F4-01 | F4 | 正常跨模块引用 |
-| TC-F4-02 | F4 | item storages 为空列表 |
-| TC-F4-03 | F4 | item 引用未定义 storage |
-| TC-F4-04 | F4 | 同模块 external alias 重复 |
-| TC-F4-05 | F4 | external alias 在目标模块不存在 |
-| TC-F4-06 | F4 | external alias 与 local storage 册突 |
-| TC-F4-07 | F4 | source_module 不存在 |
-| TC-F5-01 | F5 | 单模块合并 |
-| TC-F5-02 | F5 | 模块仅含 storage 无 items |
-| TC-F5-03 | F5 | 多模块合并 |
-| TC-F5-04 | F5 | item 引用不存在 storage（防御性） |
-| TC-F6-01 | F6 | 无溢出校验通过 |
-| TC-F6-02 | F6 | 容量溢出 |
-| TC-F6-03 | F6 | 对齐后无溢出 |
-| TC-F6-04 | F6 | 对齐填充导致溢出 |
-| TC-F6-05 | F6 | storage 无 size 限制 |
-| TC-F6-06 | F6 | length_strip 正常计算 |
-| TC-F6-07 | F6 | length_strip 字段缺失 |
-| TC-F6-08 | F6 | length_strip 字段类型错误 |
-| TC-F6-09 | F6 | 未知 data_type |
+| TC-F1-01 | RQ0-F1 | 合法模块含 log 类型且有 string_value，校验通过 |
+| TC-F1-02 | RQ0-F1 | log 类型缺少 string_value，校验失败 |
+| TC-F1-03 | RQ0-F1 | counter 类型无 string_value 要求，校验通过 |
+| TC-F1-04 | RQ0-F1 | item 缺少 name，校验失败 |
+| TC-F1-05 | RQ0-F1 | item 缺少 storages，校验失败 |
+| TC-F1-06 | RQ0-F1 | item 缺少 data_type，校验失败 |
+| TC-F1-07 | RQ0-F1 | local_storage 缺少 name，校验失败 |
+| TC-F1-08 | RQ0-F1 | 无 local_storages 且无 external_storages，校验失败 |
+| TC-F1-09 | RQ0-F1 | module 缺少 name，校验失败 |
+| TC-F1-10 | RQ0-F1 | module.name 为非字符串，校验失败 |
+| TC-F1-11 | RQ0-F1 | data_type 不在枚举中，校验失败 |
+| TC-F1-12 | RQ0-F1 | JSON 语法错误，校验失败 |
+| TC-F1-13 | RQ0-F1 | 无模块文件，警告退出 |
+| TC-F2-01 | RQ0-F2 | 无模块文件，警告退出 |
+| TC-F2-02 | RQ0-F2 | 单个合法模块，收集成功 |
+| TC-F2-03 | RQ0-F2 | 单个非法模块（缺 name），收集失败 |
+| TC-F2-04 | RQ0-F2 | 多个合法模块名不同，收集成功 |
+| TC-F2-05 | RQ0-F2 | 多模块中有非法文件，跳过后处理 |
+| TC-F2-06 | RQ0-F2 | 多模块同名，报错退出 |
+| TC-F3-01 | RQ0-F3 | 全局唯一性通过 |
+| TC-F3-02 | RQ0-F3 | items.name 跨模块冲突 |
+| TC-F3-03 | RQ0-F3 | local_storages.name 跨模块冲突 |
+| TC-F3-04 | RQ0-F3 | storage 和 item 名均有冲突 |
+| TC-F4-01 | RQ0-F4 | 正常跨模块引用 |
+| TC-F4-02 | RQ0-F4 | item storages 为空列表 |
+| TC-F4-03 | RQ0-F4 | item 引用未定义 storage |
+| TC-F4-04 | RQ0-F4 | 同模块 external alias 重复 |
+| TC-F4-05 | RQ0-F4 | external alias 在目标模块不存在 |
+| TC-F4-06 | RQ0-F4 | external alias 与 local storage 冲突 |
+| TC-F4-07 | RQ0-F4 | source_module 不存在 |
+| TC-F5-01 | RQ0-F5 | 单模块合并 |
+| TC-F5-02 | RQ0-F5 | 模块仅含 storage 无 items |
+| TC-F5-03 | RQ0-F5 | 多模块合并 |
+| TC-F5-04 | RQ0-F5 | item 引用不存在 storage（防御性） |
+| TC-F6-01 | RQ0-F6 | 无溢出校验通过 |
+| TC-F6-02 | RQ0-F6 | 容量溢出 |
+| TC-F6-03 | RQ0-F6 | 对齐后无溢出 |
+| TC-F6-04 | RQ0-F6 | 对齐填充导致溢出 |
+| TC-F6-05 | RQ0-F6 | storage 无 size 限制 |
+| TC-F6-06 | RQ0-F6 | string_value 正常计算 |
+| TC-F6-07 | RQ0-F6 | string_value 字段缺失 |
+| TC-F6-08 | RQ0-F6 | string_value 字段类型错误 |
+| TC-F6-09 | RQ0-F6 | 未知 data_type |
 
-**总用例数：40 个**
+**RQ0 总用例数：40 个**
+
+### RQ1 测试用例（srm支持静态只读资源）
+
+| 用例编号 | 功能点 | 简要描述 |
+|----------|--------|----------|
+| TC-F1-01 | RQ1-F1 | log 类型 + string_value + readonly，校验通过 |
+| TC-F1-02 | RQ1-F1 | log 类型缺少 string_value，校验失败 |
+| TC-F1-03 | RQ1-F1 | counter 类型无 string_value 要求，校验通过 |
+| TC-F1-04 | RQ1-F1 | log 类型 string_value 为整数，校验失败 |
+| TC-F2-01 | RQ1-F2 | string_value 正常值 |
+| TC-F2-02 | RQ1-F2 | string_value 空字符串 |
+| TC-F2-03 | RQ1-F2 | string_value 含特殊字符 |
+| TC-F2-04 | RQ1-F2 | string_value 含中文 |
+| TC-F3-01 | RQ1-F3 | readonly storage + log item，一致 |
+| TC-F3-02 | RQ1-F3 | readonly storage + counter item，不一致 |
+| TC-F3-03 | RQ1-F3 | readwrite storage + counter item，一致 |
+| TC-F3-04 | RQ1-F3 | readwrite storage + log item，不一致 |
+| TC-F3-05 | RQ1-F3 | readonly storage + file item，一致 |
+| TC-F3-06 | RQ1-F3 | readwrite storage + file item，不一致 |
+| TC-F3-07 | RQ1-F3 | 无 readonly 属性 + counter item，默认 readwrite |
+| TC-F4-01 | RQ1-F4 | log 数组长度 10 |
+| TC-F4-02 | RQ1-F4 | log 数组长度 0 |
+| TC-F5-01 | RQ1-F5 | file_value 指向存在的文件 |
+| TC-F5-02 | RQ1-F5 | file_value 指向不存在的文件 |
+
+**RQ1 总用例数：19 个**
+
+**全部用例总数：59 个**
 
 ---
 
@@ -368,4 +489,4 @@ D4: data_type 存在性
 | 每个用例只验证一个功能点 | ✅ | 所有用例均标注单一功能点归属，无跨功能点验证 |
 | 所有相关维度已在各功能点的树形拆分中出现 | ✅ | 每个功能点的维度等价类已穷尽覆盖 |
 | 无跨功能点冲突（相同输入组合、不同预期结果） | ✅ | 不同功能点关注不同处理阶段，输入上下文不同 |
-| 每个等价类至少被一个用例覆盖 | ✅ | 树形拆分的每个叶子节点对应一个用例，40 个用例覆盖全部等价类 |
+| 每个等价类至少被一个用例覆盖 | ✅ | 树形拆分的每个叶子节点对应一个用例，59 个用例覆盖全部等价类 |

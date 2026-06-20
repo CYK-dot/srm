@@ -1,0 +1,9 @@
+{
+  "types": [
+    {
+      "name": "invalid_type",
+      "readonly": false,
+      "alignment": 4
+    }
+  ]
+}

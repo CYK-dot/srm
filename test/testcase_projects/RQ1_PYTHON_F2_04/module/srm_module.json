@@ -1,0 +1,19 @@
+{
+  "module": {
+    "name": "test_module"
+  },
+  "local_storages": [
+    {
+      "name": "test_storage",
+      "readonly": true
+    }
+  ],
+  "items": [
+    {
+      "name": "test_item",
+      "data_type": "invalid_type",
+      "storages": ["test_storage"],
+      "string_value": "hello"
+    }
+  ]
+}

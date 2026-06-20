@@ -31,4 +31,19 @@ uint16_t srm_get_storage_size(uint16_t storage_id);
  */
 uint16_t srm_get_item_size(uint16_t item_id);
 
+/**
+ * @brief Get the item pointer from readonly storage, only support READONLY
+ * @param storage_id Storage ID
+ * @param item_id Item ID
+ * @return Pointer to the item data in the readonly array, or NULL if invalid
+ */
+const uint8_t *srm_get_readonly_item(uint16_t storage_id, uint16_t item_id);
+
+/**
+ * @brief Get the storage pointer from readonly storage, only support READONLY
+ * @param storage_id Storage ID
+ * @return Pointer to the start of the readonly storage array, or NULL if not a readonly storage
+ */
+const uint8_t *srm_get_readonly_storage(uint16_t storage_id);
+
 #endif /* SRM_H */

@@ -1,0 +1,19 @@
+{
+  "types": [
+    {
+      "name": "counter",
+      "length": 4,
+      "alignment": 4
+    },
+    {
+      "name": "measure",
+      "length": 8,
+      "alignment": 4
+    },
+    {
+      "name": "log",
+      "alignment": 1,
+      "length": 4
+    }
+  ]
+}
