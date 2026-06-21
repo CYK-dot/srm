@@ -11,12 +11,12 @@ my_project/
 │   └── deps/             // 通过CMake-FetchContent引用的SRM，会被下载到生成路径下，无需手动管理
 ├── CMakeLists.txt
 ├── main.c
-├── srm_types.json        // 需要在项目根目录中提供srm_types.json，以定制item类型
 ├── sensor/
 │   ├── srm_module.json   // 每个需要资源管理的组件，提供一份srm_module.json，来描述自己的资源视图
 │   ├── imu.c
 │   └── CMakeLists.txt
 ├── log/
+│   ├── srm_module.json   // log模块定义log_string类型
 │   ├── log.c
 │   └── CMakeLists.txt
 └── controller/
@@ -104,6 +104,12 @@ target_link_srm_library(sensor)
       "readonly": true
     }
   ],
+  "local_types": [
+    {
+      "name": "log_string",
+      "readonly": true
+    }
+  ],
   "items": [
     {
       "name": "log_err_init",
@@ -153,6 +159,13 @@ const uint8_t *tick_msg = srm_get_readonly_item(
     {
       "name": "counter_pool",
       "size": 12
+    }
+  ],
+  "local_types": [
+    {
+      "name": "counter",
+      "length": 4,
+      "alignment": 4
     }
   ],
   "items": [
@@ -208,6 +221,12 @@ void increment_tick(void) {
       "readonly": true
     }
   ],
+  "extern_types": [
+    {
+      "name": "log_string",
+      "source_module": "log"
+    }
+  ],
   "items": [
     {
       "name": "version_string",
@@ -254,6 +273,12 @@ const uint8_t *version = srm_get_readonly_item(
       "disabled": true
     }
   ],
+  "local_types": [
+    {
+      "name": "log_string",
+      "readonly": true
+    }
+  ],
   "items": [
     {
       "name": "log_debug_evt",
@@ -296,7 +321,7 @@ const uint8_t *version = srm_get_readonly_item(
 
 | 参数 | 必填 | 默认值 | 说明 |
 |------|------|--------|------|
-| PROJ_ROOT_DIR | 是 | - | 项目根目录（含 srm_types.json） |
+| PROJ_ROOT_DIR | 是 | - | 项目根目录（包含模块子目录） |
 | OUTPUT_DIR | 否 | `${CMAKE_BINARY_DIR}/srm_generated` | 生成文件输出目录 |
 
 ### target_link_srm_library
@@ -317,13 +342,31 @@ const uint8_t *version = srm_get_readonly_item(
 | size | integer | 条件 | 存储区大小（readonly 时可省略） |
 | comments | array | 否 | Doxygen 注释 |
 
+### local_types
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| name | string | 是 | 类型名称（全局唯一） |
+| length | integer | 条件 | 读写类型必须指定；字节长度（正整数） |
+| alignment | integer | 否 | 对齐方式（默认 1，必须是 2 的幂） |
+| readonly | boolean | 否 | 是否只读（默认 false） |
+| comments | array | 否 | Doxygen 注释 |
+
+### extern_types
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| name | string | 是 | 类型名称（必须存在于 source_module 的 local_types 中） |
+| source_module | string | 是 | 源模块名称（必须是已定义的模块） |
+| comments | array | 否 | Doxygen 注释 |
+
 ### items
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | name | string | 是 | 数据项名称（全局唯一） |
 | storages | array | 是 | 存储区名称列表 |
-| data_type | string | 是 | 数据类型 |
+| data_type | string | 是 | 数据类型（必须在 local_types 或 extern_types 中定义） |
 | string_value | string | 条件 | 只读字符串值 |
 | file_value | string | 条件 | 只读文件路径（相对 srm_module.json） |
 | comments | array | 否 | Doxygen 注释 |

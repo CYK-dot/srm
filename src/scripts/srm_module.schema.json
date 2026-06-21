@@ -56,6 +56,44 @@
         "additionalProperties": false
       }
     },
+    "local_types": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "length": { "type": "integer", "minimum": 1 },
+          "alignment": { "type": "integer", "minimum": 1 },
+          "readonly": { "type": "boolean" },
+          "comments": {
+            "type": "array",
+            "items": { "type": "string" },
+            "uniqueItems": true
+          }
+        },
+        "required": ["name"],
+        "additionalProperties": false
+      },
+      "uniqueItems": true
+    },
+    "extern_types": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "source_module": { "type": "string" },
+          "comments": {
+            "type": "array",
+            "items": { "type": "string" },
+            "uniqueItems": true
+          }
+        },
+        "required": ["name", "source_module"],
+        "additionalProperties": false
+      },
+      "uniqueItems": true
+    },
     "items": {
       "type": "array",
       "items": {

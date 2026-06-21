@@ -37,7 +37,7 @@ set(SRM_TARGET_NAME "srm")
 # 项目级接口：创建SRM静态库（生成layout + 编译）
 #
 # 参数：
-#   PROJ_ROOT_DIR - SRM配置目录（包含srm_types.json和模块子目录）
+#   PROJ_ROOT_DIR - SRM配置目录（包含模块子目录，types定义在各模块的srm_module.json中）
 #   OUTPUT_DIR    - 生成文件的输出目录（可选，默认 ${CMAKE_BINARY_DIR}/srm_generated）
 #
 # 行为：
@@ -62,7 +62,6 @@ function(target_add_srm_library)
 
     # 收集SRM配置文件作为构建依赖
     file(GLOB_RECURSE SRM_DEPENDS
-        "${PROJ_ROOT_DIR}/srm_types.json"
         "${PROJ_ROOT_DIR}/*/srm_module.json"
         "${PROJ_ROOT_DIR}/*/*/srm_module.json"
     )

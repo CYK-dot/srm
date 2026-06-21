@@ -98,7 +98,7 @@ def _has_modules(collected_json: Path) -> bool:
 
 def main():
     parser = argparse.ArgumentParser(description="SRM cross-platform build")
-    parser.add_argument("--root", default=".", help="SRM root directory (contains srm_types.json and modules)")
+    parser.add_argument("--root", default=".", help="SRM root directory (contains SRM modules)")
     parser.add_argument("--output-dir", default="build/srm", help="Output directory for generated files")
     args = parser.parse_args()
 
@@ -135,13 +135,12 @@ def main():
     # 4. 合并为平坦结构
     run_script("srm_project_merge.py", [str(collected_json), "-o", str(merged_json)], cwd=root)
 
-    # 5. 验证存储区容量
-    run_script("srm_layout_verify.py", ["--resolved", str(merged_json), "--types", str(root / "srm_types.json")], cwd=root)
+    # 5. 验证存储区容量 (types now come from resolved JSON)
+    run_script("srm_layout_verify.py", ["--resolved", str(merged_json)], cwd=root)
 
-    # 6. 生成 C 代码
+    # 6. 生成 C 代码 (types now come from resolved JSON)
     run_script("srm_layout_generate.py", [
         "--resolved", str(merged_json),
-        "--types", str(root / "srm_types.json"),
         "--output", str(out_base),
         "--template", str(script_dir / "srm_layout_generate.jinja2")
     ], cwd=root)

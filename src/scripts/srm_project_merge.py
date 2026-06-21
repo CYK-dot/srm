@@ -29,10 +29,14 @@ def load_project_json(path: Path, logger: Logger) -> Dict[str, Any]:
 def resolve(modules: List[Dict], logger: Logger) -> Dict[str, Any]:
     storages: Dict[str, dict] = {}
     items: List[dict] = []
+    types: Dict[str, dict] = {}
 
+    # Build module map for extern_type resolution
+    mod_map: Dict[str, Dict] = {m["module"]["name"]: m for m in modules}
+
+    # Phase 1: Collect all local_storages and local_types first
     for mod in modules:
         mod_name = mod["module"]["name"]
-        mod_file = mod.get("_file_path", ".")
 
         for storage in mod.get("local_storages", []):
             name = storage.get("name")
@@ -42,8 +46,58 @@ def resolve(modules: List[Dict], logger: Logger) -> Dict[str, Any]:
             if name in storages:
                 logger.error(f"duplicate storage name '{name}' (from module '{mod_name}')")
                 sys.exit(1)
-            # Pass through disabled flag (only for readonly storages)
             storages[name] = storage
+
+        for type_def in mod.get("local_types", []):
+            type_name = type_def.get("name")
+            if not type_name:
+                logger.error(f"module '{mod_name}': local type missing 'name'")
+                sys.exit(1)
+            if type_name in types:
+                logger.error(
+                    f"duplicate type name '{type_name}' (from module '{mod_name}')"
+                )
+                sys.exit(1)
+            types[type_name] = type_def
+
+    # Phase 2: Resolve extern_types (local_types are already all collected)
+    for mod in modules:
+        mod_name = mod["module"]["name"]
+
+        for ext in mod.get("extern_types", []):
+            ext_name = ext.get("name")
+            source_mod = ext.get("source_module")
+            if not ext_name or not source_mod:
+                logger.error(
+                    f"module '{mod_name}': extern_type missing 'name' or 'source_module'"
+                )
+                sys.exit(1)
+            if ext_name in types:
+                # Already defined as local_type in another module — skip
+                continue
+            if source_mod not in mod_map:
+                logger.error(
+                    f"module '{mod_name}': extern_type '{ext_name}' references "
+                    f"unknown source_module '{source_mod}'"
+                )
+                sys.exit(1)
+            source_types = {
+                t["name"]: t
+                for t in mod_map[source_mod].get("local_types", [])
+                if "name" in t
+            }
+            if ext_name not in source_types:
+                logger.error(
+                    f"module '{mod_name}': extern_type '{ext_name}' not found "
+                    f"in source_module '{source_mod}' local_types"
+                )
+                sys.exit(1)
+            types[ext_name] = source_types[ext_name]
+
+    # Phase 3: Collect items
+    for mod in modules:
+        mod_name = mod["module"]["name"]
+        mod_file = mod.get("_file_path", ".")
 
         for item in mod.get("items", []):
             name = item.get("name")
@@ -64,7 +118,7 @@ def resolve(modules: List[Dict], logger: Logger) -> Dict[str, Any]:
             
             items.append(item)
 
-    # Validate item storage references
+    # Phase 4: Validate item storage references
     for item in items:
         name = item.get("name")
         storage_refs = item.get("storages", [])
@@ -79,7 +133,7 @@ def resolve(modules: List[Dict], logger: Logger) -> Dict[str, Any]:
                 )
                 sys.exit(1)
 
-    return {"storages": storages, "items": items}
+    return {"storages": storages, "items": items, "types": types}
 
 def main():
     parser = argparse.ArgumentParser(

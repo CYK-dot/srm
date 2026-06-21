@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
 Validate srm_project.json:
-- Global uniqueness of local_storages.name and items.name
+- Global uniqueness of local_storages.name, local_types.name, and items.name
 - External storage alias uniqueness and source_module existence
+- Extern type alias uniqueness and source_module/type existence
 - Item storage references must be valid within the module
 """
 import argparse
@@ -29,6 +30,7 @@ def load_project_json(path: Path, logger: Logger) -> Dict[str, Any]:
 def validate_global_uniqueness(modules: List[Dict]) -> Tuple[bool, List[Tuple[str, List[str]]]]:
     errors = []
     storage_owners: Dict[str, str] = {}   # local storage name -> module name
+    type_owners: Dict[str, str] = {}      # local type name -> module name
     item_owners: Dict[str, str] = {}      # item name -> module name
 
     for mod in modules:
@@ -45,6 +47,18 @@ def validate_global_uniqueness(modules: List[Dict]) -> Tuple[bool, List[Tuple[st
                 ))
             else:
                 storage_owners[name] = mod_name
+        for type_def in mod.get("local_types", []):
+            name = type_def["name"]
+            if name in type_owners:
+                errors.append((
+                    "Duplicate local type name globally",
+                    [
+                        f"Type '{name}' is already defined in module '{type_owners[name]}'",
+                        f"Also defined in module '{mod_name}'"
+                    ]
+                ))
+            else:
+                type_owners[name] = mod_name
         for item in mod.get("items", []):
             name = item["name"]
             if name in item_owners:
@@ -140,6 +154,61 @@ def validate_module_references(modules: List[Dict]) -> Tuple[bool, List[Tuple[st
                             f"Available: {sorted(all_storage_names)}"
                         ]
                     ))
+
+        # Extern type references
+        local_type_names = {t["name"] for t in mod.get("local_types", [])}
+        ext_types = mod.get("extern_types", [])
+        ext_type_names = [e["name"] for e in ext_types]
+
+        # Duplicate extern type aliases within module
+        if len(set(ext_type_names)) != len(ext_type_names):
+            duplicates = [n for n in ext_type_names if ext_type_names.count(n) > 1]
+            errors.append((
+                "Duplicate extern type aliases within module",
+                [f"Module '{mod_name}' has duplicate extern_type alias(es): {sorted(set(duplicates))}"]
+            ))
+
+        # Extern type alias conflicts with local type
+        for alias in ext_type_names:
+            if alias in local_type_names:
+                errors.append((
+                    "Extern type alias conflicts with local type",
+                    [
+                        f"Module '{mod_name}' defines extern_type alias '{alias}'",
+                        f"But a local_type with the same name exists in this module"
+                    ]
+                ))
+
+        # Check each extern type reference
+        for ext in ext_types:
+            alias = ext.get("name")
+            target_mod = ext.get("source_module")
+            if not alias or not target_mod:
+                errors.append((
+                    "Malformed extern_types entry",
+                    [f"In module '{mod_name}': entry missing 'name' or 'source_module': {ext}"]
+                ))
+                continue
+            if target_mod not in mod_map:
+                errors.append((
+                    "Extern type target module not found",
+                    [
+                        f"Module '{mod_name}' references extern_type '{alias}'",
+                        f"Target module '{target_mod}' does not exist"
+                    ]
+                ))
+                continue
+            target = mod_map[target_mod]
+            target_local_types = {t["name"] for t in target.get("local_types", [])}
+            if alias not in target_local_types:
+                errors.append((
+                    "Extern type target missing",
+                    [
+                        f"Module '{mod_name}' references extern_type '{alias}' from module '{target_mod}'",
+                        f"Module '{target_mod}' has no local_type named '{alias}'",
+                        f"Available: {sorted(target_local_types)}"
+                    ]
+                ))
 
     return len(errors) == 0, errors
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate C header/source files from resolved.json and types.json.
+Generate C header/source files from resolved.json.
 Generates:
 1. Compile-time macros for Storage/Item IDs and sizes/types.
 2. A runtime function srm_get_offset(storage_id, item_id) using nested switch.
@@ -229,7 +229,7 @@ def build_layout_entries(storages: dict, items: List[dict], type_map: dict) -> L
 def main():
     parser = argparse.ArgumentParser(description="Generate C code from resolved SRM data")
     parser.add_argument("--resolved", default="srm_resolved.json", help="resolved JSON file")
-    parser.add_argument("--types", default="srm_types.json", help="type definition file")
+    parser.add_argument("--types", default=None, help="type definition file (optional, defaults to types in resolved JSON)")
     parser.add_argument("--output", "-o", default="srm_layout", help="output base name (without extension)")
     parser.add_argument("--template", default="srm_layout_generate.jinja2", help="Jinja2 template file")
     parser.add_argument("-v", "--verbose", action="store_true")
@@ -237,23 +237,30 @@ def main():
 
     logger = Logger(PROG_NAME)
 
-    types_data = load_json(Path(args.types), logger, "Types")
-    if "types" not in types_data:
-        logger.error("srm_types.json missing 'types' array")
-        sys.exit(1)
-
-    type_map = {}
-    type_to_code = {}
-    for idx, entry in enumerate(types_data["types"], start=1):
-        t_name = entry.get("name")
-        if t_name:
-            type_map[t_name] = entry
-            type_to_code[t_name] = idx
-
     resolved = load_json(Path(args.resolved), logger, "Resolved")
     if "storages" not in resolved or "items" not in resolved:
         logger.error("resolved file must contain 'storages' and 'items' keys")
         sys.exit(1)
+
+    # Load types: prefer --types file, fall back to resolved JSON
+    if args.types:
+        types_data = load_json(Path(args.types), logger, "Types")
+        if "types" not in types_data:
+            logger.error("types file missing 'types' array")
+            sys.exit(1)
+        type_map = {}
+        type_to_code = {}
+        for idx, entry in enumerate(types_data["types"], start=1):
+            t_name = entry.get("name")
+            if t_name:
+                type_map[t_name] = entry
+                type_to_code[t_name] = idx
+    else:
+        if "types" not in resolved:
+            logger.error("resolved JSON missing 'types' and no --types file specified")
+            sys.exit(1)
+        type_map = resolved["types"]
+        type_to_code = {t_name: idx for idx, t_name in enumerate(type_map.keys(), start=1)}
 
     storages = resolved["storages"]
     items_data = resolved["items"]

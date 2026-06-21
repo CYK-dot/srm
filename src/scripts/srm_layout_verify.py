@@ -29,7 +29,7 @@ def load_json(path: Path, logger: Logger, description: str) -> dict:
 
 def validate_type_definitions(type_map: dict, logger: Logger) -> bool:
     """
-    校验 srm_types.json 中类型定义的合法性。
+    校验类型定义的合法性。
     
     合法组合：
     - readonly=true, 无 length → 只读类型（不定长）
@@ -304,8 +304,8 @@ def main():
     )
     parser.add_argument(
         "--types",
-        default="srm_types.json",
-        help="path to type definition file",
+        default=None,
+        help="path to type definition file (optional, defaults to types in resolved JSON)",
     )
     parser.add_argument(
         "--resolved",
@@ -317,21 +317,23 @@ def main():
 
     logger = Logger(PROG_NAME)
 
-    types_data = load_json(Path(args.types), logger, "Types")
-    if "types" not in types_data:
-        logger.error("srm_types.json missing 'types' array")
-        sys.exit(1)
-    type_map = {entry["name"]: entry for entry in types_data["types"] if "name" in entry}
-
-    # 校验类型定义的合法性
-    if not validate_type_definitions(type_map, logger):
-        logger.error("type definition validation failed")
-        sys.exit(1)
-
     resolved = load_json(Path(args.resolved), logger, "Resolved")
     if "storages" not in resolved or "items" not in resolved:
         logger.error("resolved file must contain 'storages' and 'items' keys")
         sys.exit(1)
+
+    # Load types: prefer --types file, fall back to resolved JSON
+    if args.types:
+        types_data = load_json(Path(args.types), logger, "Types")
+        if "types" not in types_data:
+            logger.error("types file missing 'types' array")
+            sys.exit(1)
+        type_map = {entry["name"]: entry for entry in types_data["types"] if "name" in entry}
+    else:
+        if "types" not in resolved:
+            logger.error("resolved JSON missing 'types' and no --types file specified")
+            sys.exit(1)
+        type_map = resolved["types"]
 
     storages = resolved["storages"]
     items = resolved["items"]

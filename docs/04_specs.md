@@ -12,15 +12,25 @@
 
 ## RQ0: 类型系统
 
-### RQ0.F1: SRM 支持类型定义
+### RQ0.F1: SRM 支持本地类型定义
 
-SRM 支持通过 `srm_types.json` 定义数据类型。
+SRM 支持通过 `local_types` 数组在模块中定义数据类型。
 
 | IPO | 内容 |
 |-----|------|
-| **Input** | `srm_types.json` 中的 `types` 数组 |
+| **Input** | `srm_module.json` 中的 `local_types` 数组 |
 | **Process** | 每个类型必须包含 `name` 字段；固定长度类型必须包含 `length` 字段（正整数）；只读类型必须包含 `readonly: true`，可省略 `length`；可选 `alignment` 字段（默认 1，必须是 2 的幂） |
 | **Output** | 类型注册表，供后续存储区和数据项使用 |
+
+### RQ0.F1b: SRM 支持外部类型引用
+
+SRM 支持通过 `extern_types` 数组引用其他模块定义的类型。
+
+| IPO | 内容 |
+|-----|------|
+| **Input** | `srm_module.json` 中的 `extern_types` 数组 |
+| **Process** | 必须包含 `name` 和 `source_module` 字段；`source_module` 必须指向已定义的模块；目标模块的 `local_types` 中必须包含指定的类型 |
+| **Output** | 外部类型引用注册表，合并到全局类型注册表 |
 
 ### RQ0.F2: SRM 支持类型命名校验
 
@@ -87,7 +97,7 @@ SRM 支持通过 `items` 数组定义存储区中的数据项。
 | IPO | 内容 |
 |-----|------|
 | **Input** | `items` 数组中的数据项对象 |
-| **Process** | 必须包含 `name`、`storages`、`data_type` 字段；`name` 全局唯一；`data_type` 必须在 `srm_types.json` 中定义；`storages` 数组中的每个名称必须存在于当前模块 |
+| **Process** | 必须包含 `name`、`storages`、`data_type` 字段；`name` 全局唯一；`data_type` 必须在 `local_types` 或 `extern_types` 中定义；`storages` 数组中的每个名称必须存在于当前模块 |
 | **Output** | 数据项注册表 |
 
 ### RQ2.F2: SRM 支持固定长度数据项
@@ -238,12 +248,12 @@ SRM 支持自动处理代码生成和编译的构建顺序。
 
 ### RQ6.F1: SRM 支持全局唯一性校验
 
-SRM 支持对模块、存储区、数据项名称进行全局唯一性校验。
+SRM 支持对模块、存储区、类型、数据项名称进行全局唯一性校验。
 
 | IPO | 内容 |
 |-----|------|
-| **Input** | 所有模块的存储区和数据项 |
-| **Process** | 模块名称全局唯一；存储区名称全局唯一；数据项名称全局唯一；重复时构建失败并报错 |
+| **Input** | 所有模块的存储区、类型和数据项 |
+| **Process** | 模块名称全局唯一；存储区名称全局唯一；类型名称全局唯一；数据项名称全局唯一；重复时构建失败并报错 |
 | **Output** | 验证通过或报错 |
 
 ### RQ6.F2: SRM 支持引用有效性校验
@@ -253,7 +263,7 @@ SRM 支持对所有引用关系进行有效性校验。
 | IPO | 内容 |
 |-----|------|
 | **Input** | 所有引用关系 |
-| **Process** | 数据项引用的存储区必须存在；外部存储区引用的模块必须存在；引用无效时构建失败并报错 |
+| **Process** | 数据项引用的存储区必须存在；外部存储区引用的模块必须存在；外部类型引用的模块和类型必须存在；引用无效时构建失败并报错 |
 | **Output** | 验证通过或报错 |
 
 ### RQ6.F3: SRM 支持文件存在性校验
