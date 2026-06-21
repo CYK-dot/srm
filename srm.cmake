@@ -89,6 +89,7 @@ function(target_add_srm_library)
                 "${SRM_SCRIPTS_DIR}/srm_layout_verify.py"
                 "${SRM_SCRIPTS_DIR}/srm_layout_generate.py"
                 "${SRM_SCRIPTS_DIR}/srm_log.py"
+                "${SRM_SCRIPTS_DIR}/srm_merged.schema.json"
         COMMENT "Generating SRM layout"
         VERBATIM
     )
@@ -110,6 +111,8 @@ function(target_add_srm_library)
     set_target_properties(${SRM_TARGET_NAME} PROPERTIES
         SRM_OUTPUT_DIR "${OUTPUT_DIR}"
     )
+
+    set(SRM_MERGED_JSON "${OUTPUT_DIR}/srm_merged.json" PARENT_SCOPE)
 endfunction()
 
 # =============================================================================

@@ -1,0 +1,115 @@
+{
+  "module": {
+    "name": "sensor",
+    "comments": [
+      "Sensor module — demonstrates all SRM features",
+      "Provides counter pool, config table, and debug logging"
+    ]
+  },
+
+  "local_storages": [
+    {
+      "name": "counter_pool",
+      "size": 32,
+      "comments": [
+        "Read-write counter pool shared across subsystems"
+      ]
+    },
+    {
+      "name": "config_table",
+      "readonly": true,
+      "comments": [
+        "Read-only calibration data stored in Flash"
+      ]
+    },
+    {
+      "name": "debug_log",
+      "readonly": true,
+      "disabled": true,
+      "comments": [
+        "Debug-level log strings — disabled in release builds",
+        "Set disabled=false to include in Flash"
+      ]
+    }
+  ],
+
+  "external_storages": [
+    {
+      "name": "log_strings",
+      "source_module": "log",
+      "comments": [
+        "Reuse the log module's readonly string storage"
+      ]
+    }
+  ],
+
+  "local_types": [
+    {
+      "name": "counter",
+      "length": 4,
+      "alignment": 4,
+      "comments": [
+        "32-bit unsigned counter, 4-byte aligned"
+      ]
+    }
+  ],
+
+  "extern_types": [
+    {
+      "name": "log_string",
+      "source_module": "log",
+      "comments": [
+        "Reference the log module's readonly string type"
+      ]
+    }
+  ],
+
+  "items": [
+    {
+      "name": "tick_count",
+      "storages": ["counter_pool"],
+      "data_type": "counter",
+      "comments": ["System tick counter — incremented every 1 ms"]
+    },
+    {
+      "name": "evt_post_count",
+      "storages": ["counter_pool"],
+      "data_type": "counter",
+      "comments": ["Event-posted counter for throughput measurement"]
+    },
+    {
+      "name": "calibration_data",
+      "storages": ["config_table"],
+      "data_type": "log_string",
+      "file_value": "calibration.hex",
+      "comments": [
+        "Factory calibration blob loaded from file"
+      ]
+    },
+    {
+      "name": "device_version",
+      "storages": ["config_table"],
+      "data_type": "log_string",
+      "string_value": "sensor v2.1.0",
+      "comments": [
+        "Read-only version string in Flash"
+      ]
+    },
+    {
+      "name": "log_err_init",
+      "storages": ["log_strings"],
+      "data_type": "log_string",
+      "string_value": "ERR: sensor init failed",
+      "comments": ["Initialization error"]
+    },
+    {
+      "name": "log_debug_sample",
+      "storages": ["debug_log"],
+      "data_type": "log_string",
+      "string_value": "DBG: sample=%d",
+      "comments": [
+        "Per-sample debug print — only present when debug_log is enabled"
+      ]
+    }
+  ]
+}

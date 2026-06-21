@@ -1,0 +1,74 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://example.com/schemas/srm_merged.schema.json",
+  "title": "SRM Merged Layout",
+  "description": "Schema for srm_merged.json - flattened SRM layout output",
+  "type": "object",
+  "properties": {
+    "storages": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "size": { "type": "integer", "minimum": 0 },
+          "readonly": { "type": "boolean" },
+          "disabled": { "type": "boolean" },
+          "comments": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "required": ["name"],
+        "additionalProperties": false
+      }
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "storages": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "data_type": { "type": "string" },
+          "string_value": { "type": "string" },
+          "file_value": { "type": "string" },
+          "_file_value_resolved": { "type": "string" },
+          "comments": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "_iid": { "type": "integer", "minimum": 0 },
+          "_module": { "type": "string" }
+        },
+        "required": ["name", "storages", "data_type", "_iid", "_module"],
+        "additionalProperties": true
+      }
+    },
+    "types": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "length": { "type": "integer", "minimum": 1 },
+          "alignment": { "type": "integer", "minimum": 1 },
+          "readonly": { "type": "boolean" },
+          "comments": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "required": ["name"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["storages", "items", "types"],
+  "additionalProperties": false
+}

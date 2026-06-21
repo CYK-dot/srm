@@ -96,6 +96,49 @@ def _has_modules(collected_json: Path) -> bool:
     except Exception:
         return False
 
+def _validate_merged_json(merged_json: Path, schema_path: Path) -> None:
+    """Validate srm_merged.json against srm_merged.schema.json."""
+    import json
+    try:
+        from jsonschema import Draft7Validator
+    except ImportError:
+        print("[SRM] WARNING: jsonschema not installed, skipping schema validation", file=sys.stderr)
+        return
+
+    try:
+        with open(merged_json, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception as e:
+        print(f"[SRM] ERROR: cannot read {merged_json}: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        with open(schema_path, "r", encoding="utf-8") as f:
+            schema = json.load(f)
+    except Exception as e:
+        print(f"[SRM] ERROR: cannot read schema {schema_path}: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    validator = Draft7Validator(schema)
+    errors = []
+    for error in validator.iter_errors(data):
+        path_parts = []
+        for part in error.absolute_path:
+            if isinstance(part, int):
+                path_parts.append(f"[{part}]")
+            else:
+                path_parts.append(f"/{part}")
+        json_path = "".join(path_parts) if path_parts else "root"
+        errors.append(f"field {json_path} -> {error.message}")
+
+    if errors:
+        print(f"[SRM] ERROR: {merged_json} failed schema validation:", file=sys.stderr)
+        for err in errors:
+            print(f"    {err}", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"[SRM] {merged_json.name} passed schema validation")
+
 def main():
     parser = argparse.ArgumentParser(description="SRM cross-platform build")
     parser.add_argument("--root", default=".", help="SRM root directory (contains SRM modules)")
@@ -111,7 +154,7 @@ def main():
 
     # 定义各步骤输出文件
     collected_json = output_dir / "collected.json"
-    merged_json    = output_dir / "merged.json"
+    merged_json    = output_dir / "srm_merged.json"
     out_base       = output_dir / "srm_layout"  # 无扩展名
 
     print()  # 空行分隔
@@ -134,6 +177,10 @@ def main():
 
     # 4. 合并为平坦结构
     run_script("srm_project_merge.py", [str(collected_json), "-o", str(merged_json)], cwd=root)
+
+    # 4b. 校验合并产物的 JSON Schema
+    schema_path = script_dir / "srm_merged.schema.json"
+    _validate_merged_json(merged_json, schema_path)
 
     # 5. 验证存储区容量 (types now come from resolved JSON)
     run_script("srm_layout_verify.py", ["--resolved", str(merged_json)], cwd=root)

@@ -95,6 +95,7 @@ def resolve(modules: List[Dict], logger: Logger) -> Dict[str, Any]:
             types[ext_name] = source_types[ext_name]
 
     # Phase 3: Collect items
+    item_idx = 0  # 全局 item 索引，用于生成 _iid
     for mod in modules:
         mod_name = mod["module"]["name"]
         mod_file = mod.get("_file_path", ".")
@@ -115,6 +116,10 @@ def resolve(modules: List[Dict], logger: Logger) -> Dict[str, Any]:
                     )
                     sys.exit(1)
                 item["_file_value_resolved"] = str(item_file_path.resolve())
+            
+            item["_iid"] = item_idx
+            item["_module"] = mod_name
+            item_idx += 1
             
             items.append(item)
 
